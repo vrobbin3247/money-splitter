@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import ExpenseForm from "../src/components/expenses/ExpenseForm";
 
 export default function Home() {
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
