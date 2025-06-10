@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
+import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
 
 interface Profile {
   id: string;
-  full_name: string;
+  name: string;
 }
 
 interface ExpenseFormData {
@@ -21,9 +21,9 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
   const { user } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [formData, setFormData] = useState<ExpenseFormData>({
-    title: '',
+    title: "",
     amount: 0,
-    participants: []
+    participants: user ? [user.id] : [],
   });
   const [amountPerPerson, setAmountPerPerson] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -32,8 +32,14 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
   const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
+    if (user?.id) {
+      setFormData((prev) => ({
+        ...prev,
+        participants: [user.id],
+      }));
+    }
     fetchProfiles();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     calculateAmountPerPerson();
@@ -42,13 +48,13 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
   const fetchProfiles = async () => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name');
-      
+        .from("profiles")
+        .select("id, name");
+
       if (error) throw error;
       setProfiles(data || []);
     } catch (err) {
-      setError('Failed to fetch profiles');
+      setError("Failed to fetch profiles");
       console.error(err);
     }
   };
@@ -60,16 +66,16 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'amount' ? parseFloat(value) || 0 : value
+      [name]: name === "amount" ? parseFloat(value) || 0 : value,
     }));
   };
 
   const handleCheckboxChange = (profileId: string) => {
-    setFormData(prev => {
+    setFormData((prev) => {
       const newParticipants = prev.participants.includes(profileId)
-        ? prev.participants.filter(id => id !== profileId)
+        ? prev.participants.filter((id) => id !== profileId)
         : [...prev.participants, profileId];
       return { ...prev, participants: newParticipants };
     });
@@ -82,46 +88,52 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
     setSuccess(false);
 
     try {
-      if (!formData.title || formData.amount <= 0 || formData.participants.length === 0) {
-        throw new Error('Please fill all fields and select at least one participant');
+      if (
+        !formData.title ||
+        formData.amount <= 0 ||
+        formData.participants.length === 0
+      ) {
+        throw new Error(
+          "Please fill all fields and select at least one participant"
+        );
       }
 
       const { data: expense, error: expenseError } = await supabase
-        .from('expenses')
+        .from("expenses")
         .insert({
           title: formData.title,
           amount: formData.amount,
-          paid_by: user?.id
+          paid_by: user?.id,
         })
         .select()
         .single();
 
       if (expenseError) throw expenseError;
 
-      const participantsData = formData.participants.map(participantId => ({
+      const participantsData = formData.participants.map((participantId) => ({
         expense_id: expense.id,
         user_id: participantId,
-        amount_owed: amountPerPerson
+        amount_owed: amountPerPerson,
       }));
 
       const { error: participantsError } = await supabase
-        .from('expense_participants')
+        .from("expense_participants")
         .insert(participantsData);
 
       if (participantsError) throw participantsError;
 
       setSuccess(true);
       setFormData({
-        title: '',
+        title: "",
         amount: 0,
-        participants: []
+        participants: [],
       });
-      
+
       if (asPopup) {
         setTimeout(() => setShowModal(false), 1500);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to create expense');
+      setError(err instanceof Error ? err.message : "Failed to create expense");
     } finally {
       setLoading(false);
     }
@@ -143,7 +155,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
               <div className="p-4">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-bold">Add New Expense</h2>
-                  <button 
+                  <button
                     onClick={() => setShowModal(false)}
                     className="text-gray-500 hover:text-gray-700"
                   >
@@ -182,7 +194,10 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="title"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Title
             </label>
             <input
@@ -197,38 +212,45 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
           </div>
 
           <div>
-            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="amount"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Amount
             </label>
             <input
               id="amount"
               name="amount"
               type="number"
-              min="0.01"
-              step="0.01"
-              value={formData.amount || ''}
+              min="1"
+              step="1"
+              value={formData.amount || ""}
               onChange={handleInputChange}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
-              placeholder="0.00"
+              placeholder="0"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">Participants</label>
+            <label className="block text-sm font-medium text-gray-700">
+              Participants
+            </label>
             <div className="space-y-2">
-              {profiles.map(profile => (
+              {profiles.map((profile) => (
                 <div key={profile.id} className="flex items-center gap-2">
                   <input
                     type="checkbox"
                     id={`participant-${profile.id}`}
                     checked={formData.participants.includes(profile.id)}
                     onChange={() => handleCheckboxChange(profile.id)}
-                    disabled={profile.id === user?.id}
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  <label htmlFor={`participant-${profile.id}`} className="text-sm text-gray-700">
-                    {profile.full_name} {profile.id === user?.id && '(You)'}
+                  <label
+                    htmlFor={`participant-${profile.id}`}
+                    className="text-sm text-gray-700"
+                  >
+                    {profile.name} {profile.id === user?.id && "(You)"}
                   </label>
                 </div>
               ))}
@@ -237,7 +259,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
 
           <div className="p-4 bg-gray-50 rounded-lg">
             <p className="font-medium">Amount per person:</p>
-            <p className="text-xl font-bold">${amountPerPerson.toFixed(2)}</p>
+            <p className="text-xl font-bold">₹{amountPerPerson.toFixed(2)}</p>
           </div>
 
           <button
@@ -245,7 +267,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50"
           >
-            {loading ? 'Processing...' : 'Add Expense'}
+            {loading ? "Processing..." : "Add Expense"}
           </button>
         </form>
       </>
