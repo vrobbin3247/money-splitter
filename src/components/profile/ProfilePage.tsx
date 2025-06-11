@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from "react";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 type Roommate = {
   id: string;
@@ -11,83 +11,70 @@ type Roommate = {
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [roommates, setRoommates] = useState<Roommate[]>([]);
-  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteEmail, setInviteEmail] = useState("");
   const navigate = useNavigate();
 
   const fetchProfile = async () => {
     if (!user) return;
-    
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
         .maybeSingle();
-
       if (error) throw error;
-      if (data) {
-        setName(data.name);
-      } else {
-        setError('Profile not found - please complete your profile setup');
-      }
+      if (data) setName(data.name);
+      else setError("Profile not found - please complete your profile setup");
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      setError('Failed to load profile');
+      console.error("Error fetching profile:", error);
+      setError("Failed to load profile");
     }
   };
 
   const fetchRoommates = async () => {
     if (!user) return;
-    
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name')
-        .neq('id', user.id);
-
+        .from("profiles")
+        .select("id, name")
+        .neq("id", user.id);
       if (error) throw error;
       if (data) {
-        const roommateData = await Promise.all(data.map(async (profile: { id: string; name: string }) => {
-          const { data: userData } = await supabase
-            .from('users')
-            .select('email')
-            .eq('id', profile.id)
-            .single();
-          return {
-            ...profile,
-            email: userData?.email || 'Unknown'
-          };
-        }));
+        const roommateData = await Promise.all(
+          data.map(async (profile) => {
+            const { data: userData } = await supabase
+              .from("users")
+              .select("email")
+              .eq("id", profile.id)
+              .single();
+            return { ...profile, email: userData?.email || "Unknown" };
+          })
+        );
         setRoommates(roommateData);
       }
     } catch (error) {
-      console.error('Error fetching roommates:', error);
-      setError('Failed to load roommates');
+      console.error("Error fetching roommates:", error);
+      setError("Failed to load roommates");
     }
   };
 
   const updateProfile = async () => {
     if (!user) return;
     setLoading(true);
-    setError('');
-
+    setError("");
     try {
       const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: user.id,
-          name,
-        }, {
-          onConflict: 'id'
-        });
-
+        .from("profiles")
+        .upsert({ id: user.id, name }, { onConflict: "id" });
       if (error) throw error;
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Profile update failed');
+      setError(
+        error instanceof Error ? error.message : "Profile update failed"
+      );
     } finally {
       setLoading(false);
     }
@@ -96,13 +83,12 @@ export default function ProfilePage() {
   const handleInvite = async () => {
     if (!inviteEmail) return;
     setLoading(true);
-    setError('');
-
+    setError("");
     try {
       alert(`Invitation sent to ${inviteEmail}`);
-      setInviteEmail('');
+      setInviteEmail("");
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Invitation failed');
+      setError(error instanceof Error ? error.message : "Invitation failed");
     } finally {
       setLoading(false);
     }
@@ -116,68 +102,74 @@ export default function ProfilePage() {
   }, [user]);
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <div className="flex justify-between items-center mb-4">
-        <button 
-          onClick={() => navigate('/')}
-          className="text-blue-500 hover:text-blue-700"
+    <div className="min-h-screen bg-[#fdfaf6] px-4 pt-6 pb-20 text-gray-800">
+      <div className="flex justify-between items-center mb-6">
+        <button
+          onClick={() => navigate("/")}
+          className="text-sm text-blue-600 hover:underline"
         >
-          ← Back to Dashboard
+          ← Dashboard
         </button>
-        <h1 className="text-2xl font-bold">Your Profile</h1>
-        <div className="w-8"></div>
+        <h1 className="text-xl font-semibold">Your Profile</h1>
+        <div className="w-6"></div>
       </div>
-      
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-      
-      <div className="mb-6">
-        <label htmlFor="name" className="block mb-2">Your Name</label>
+
+      {error && <p className="text-red-500 mb-4 text-sm">{error}</p>}
+
+      {/* Profile Edit Section */}
+      <div className="bg-white rounded-xl shadow p-4 mb-6">
+        <label htmlFor="name" className="block mb-2 font-medium">
+          Your Name
+        </label>
         <input
           id="name"
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full p-2 border rounded mb-2"
+          className="w-full p-2 border border-gray-300 rounded-lg mb-4"
           required
         />
         <button
           onClick={updateProfile}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
           disabled={loading}
         >
-          {loading ? 'Saving...' : 'Save Profile'}
+          {loading ? "Saving..." : "Save Profile"}
         </button>
       </div>
 
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">Your Roommates</h2>
+      {/* Roommate List */}
+      <div className="bg-white rounded-xl shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-3">Roommates</h2>
         {roommates.length === 0 ? (
-          <p>No roommates yet</p>
+          <p className="text-sm text-gray-500">No roommates yet</p>
         ) : (
-          <ul className="space-y-2">
-            {roommates.map((roommate) => (
-              <li key={roommate.id} className="flex justify-between items-center">
-                <span>{roommate.name} ({roommate.email})</span>
+          <ul className="divide-y">
+            {roommates.map((r) => (
+              <li key={r.id} className="py-2 text-sm">
+                <span className="font-medium">{r.name}</span> —{" "}
+                <span className="text-gray-600">{r.email}</span>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Invite Roommates</h2>
+      {/* Invite Roommate */}
+      <div className="bg-white rounded-xl shadow p-4">
+        <h2 className="text-lg font-semibold mb-3">Invite a Roommate</h2>
         <div className="flex">
           <input
             type="email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="Enter email address"
-            className="flex-1 p-2 border rounded-l"
+            placeholder="Enter email"
+            className="flex-1 p-2 border border-gray-300 rounded-l-lg"
             required
           />
           <button
             onClick={handleInvite}
-            className="bg-green-500 text-white px-4 py-2 rounded-r hover:bg-green-600"
+            className="bg-green-600 text-white px-4 py-2 rounded-r-lg hover:bg-green-700 transition"
             disabled={loading}
           >
             Invite

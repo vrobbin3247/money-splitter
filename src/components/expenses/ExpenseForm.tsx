@@ -103,24 +103,28 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
         .insert({
           title: formData.title,
           amount: formData.amount,
-          paid_by: user?.id,
+          buyer_id: user?.id,
         })
         .select()
         .single();
 
       if (expenseError) throw expenseError;
 
+      // NEW CHECK: Ensure the user is the buyer before adding participants
+      if (expense.buyer_id !== user?.id) {
+        throw new Error(
+          "You are not authorized to add participants to this expense."
+        );
+      }
+
       const participantsData = formData.participants.map((participantId) => ({
         expense_id: expense.id,
-        user_id: participantId,
-        amount_owed: amountPerPerson,
+        participant_id: participantId,
       }));
 
       const { error: participantsError } = await supabase
         .from("expense_participants")
         .insert(participantsData);
-
-      if (participantsError) throw participantsError;
 
       setSuccess(true);
       setFormData({
@@ -144,7 +148,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
       <>
         <button
           onClick={() => setShowModal(true)}
-          className="fixed bottom-6 right-6 bg-blue-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 transition-colors z-50"
+          className="fixed bottom-6 right-6 bg-gray-800 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700 transition-colors z-50"
         >
           <span className="text-2xl">+</span>
         </button>
@@ -265,7 +269,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50"
+            className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50"
           >
             {loading ? "Processing..." : "Add Expense"}
           </button>
