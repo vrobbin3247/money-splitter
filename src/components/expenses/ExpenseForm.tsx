@@ -1,6 +1,18 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
+import {
+  FaUtensils,
+  FaTaxi,
+  FaHome,
+  FaLightbulb,
+  FaEllipsisH,
+  FaPlus,
+  FaTimes,
+  FaCheck,
+} from "react-icons/fa";
+// import { GiMoneyStack } from "react-icons/gi";
+import { FaIndianRupeeSign } from "react-icons/fa6";
 
 interface Profile {
   id: string;
@@ -10,6 +22,7 @@ interface Profile {
 interface ExpenseFormData {
   title: string;
   amount: number;
+  category: "food" | "travel" | "rent" | "utilities" | "misc";
   participants: string[];
 }
 
@@ -19,12 +32,17 @@ interface ExpenseFormProps {
   onCancel?: () => void;
 }
 
-export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
+export default function ExpenseForm({
+  asPopup = false,
+  onSuccess,
+  onCancel,
+}: ExpenseFormProps) {
   const { user } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [formData, setFormData] = useState<ExpenseFormData>({
     title: "",
     amount: 0,
+    category: "misc",
     participants: user ? [user.id] : [],
   });
   const [amountPerPerson, setAmountPerPerson] = useState<number>(0);
@@ -32,6 +50,34 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [showModal, setShowModal] = useState(false);
+
+  const categories = [
+    {
+      value: "food",
+      label: "Food",
+      icon: <FaUtensils className="text-red-500" />,
+    },
+    {
+      value: "travel",
+      label: "Travel",
+      icon: <FaTaxi className="text-blue-500" />,
+    },
+    {
+      value: "rent",
+      label: "Rent",
+      icon: <FaHome className="text-green-500" />,
+    },
+    {
+      value: "utilities",
+      label: "Utilities",
+      icon: <FaLightbulb className="text-yellow-500" />,
+    },
+    {
+      value: "other",
+      label: "Other",
+      icon: <FaEllipsisH className="text-gray-500" />,
+    },
+  ];
 
   useEffect(() => {
     if (user?.id) {
@@ -59,7 +105,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
     if (showModal) {
       setTimeout(() => {
         document.getElementById("title")?.focus();
-      }, 100); // small delay for modal to render
+      }, 100);
     }
   }, [showModal]);
 
@@ -78,11 +124,22 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
     setAmountPerPerson(formData.amount / count);
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: name === "amount" ? parseFloat(value) || 0 : value,
+    }));
+  };
+
+  const handleCategoryChange = (
+    category: "food" | "travel" | "rent" | "utilities" | "other"
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      category,
     }));
   };
 
@@ -107,7 +164,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
         formData.amount <= 0 ||
         formData.participants.length === 0
       ) {
-        throw new Error("Please fill all fields and select participants");
+        throw new Error("Please fill all required fields");
       }
 
       const { data: expense, error: expenseError } = await supabase
@@ -116,15 +173,12 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
           title: formData.title,
           amount: formData.amount,
           buyer_id: user?.id,
+          category: formData.category,
         })
         .select()
         .single();
 
       if (expenseError) throw expenseError;
-
-      if (expense.buyer_id !== user?.id) {
-        throw new Error("You're not authorized to add participants");
-      }
 
       const participantsData = formData.participants.map((id) => ({
         expense_id: expense.id,
@@ -141,10 +195,18 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
       setFormData({
         title: "",
         amount: 0,
+        category: "other",
         participants: user ? [user.id] : [],
       });
 
-      if (asPopup) setTimeout(() => setShowModal(false), 1500);
+      if (asPopup) {
+        setTimeout(() => {
+          setShowModal(false);
+          onSuccess?.();
+        }, 1000);
+      } else {
+        onSuccess?.();
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Error creating expense");
     } finally {
@@ -152,18 +214,38 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
     }
   };
 
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      amount: 0,
+      category: "other",
+      participants: user ? [user.id] : [],
+    });
+    setError(null);
+    setSuccess(false);
+  };
+
   const renderFormContent = () => (
     <>
-      {error && <p className="text-red-600">{error}</p>}
+      {error && (
+        <div className="p-3 mb-4 bg-red-100 border border-red-400 text-red-700 rounded flex items-center gap-2">
+          <FaTimes className="flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
       {success && (
-        <div className="flex items-center gap-2 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-          = <span>Expense added successfully!</span>
+        <div className="p-3 mb-4 bg-green-100 border border-green-400 text-green-700 rounded flex items-center gap-2">
+          <FaCheck className="flex-shrink-0" />
+          <span>Expense added successfully!</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="title" className="block mb-1 text-sm font-medium">
+          <label
+            htmlFor="title"
+            className="block mb-2 text-sm font-medium text-gray-700"
+          >
             Title
           </label>
           <input
@@ -173,28 +255,63 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
             onChange={handleInputChange}
             placeholder="What was this expense for?"
             required
-            className="w-full border rounded p-2"
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
 
         <div>
-          <label htmlFor="amount" className="block mb-1 text-sm font-medium">
+          <label
+            htmlFor="amount"
+            className="block mb-2 text-sm font-medium text-gray-700"
+          >
             Amount
           </label>
-          <input
-            id="amount"
-            name="amount"
-            type="number"
-            min="1"
-            value={formData.amount || ""}
-            onChange={handleInputChange}
-            required
-            className="w-full border rounded p-2"
-          />
+          <div className="relative rounded-md shadow-sm">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <FaIndianRupeeSign className="text-gray-400" />
+            </div>
+            <input
+              id="amount"
+              name="amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={formData.amount || ""}
+              onChange={handleInputChange}
+              required
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
         </div>
 
         <div>
-          <label className="block mb-1 text-sm font-medium">Participants</label>
+          <label className="block mb-2 text-sm font-medium text-gray-700">
+            Category
+          </label>
+          <div className="grid grid-cols-5 gap-2">
+            {categories.map((cat) => (
+              <button
+                type="button"
+                key={cat.value}
+                onClick={() => handleCategoryChange(cat.value as any)}
+                className={`p-2 rounded-lg border flex flex-col items-center justify-center transition-colors ${
+                  formData.category === cat.value
+                    ? "bg-blue-100 border-blue-500"
+                    : "bg-gray-50 border-gray-200 hover:bg-gray-100"
+                }`}
+                aria-label={cat.label}
+              >
+                <span className="text-xl mb-1">{cat.icon}</span>
+                <span className="text-sm">{cat.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block mb-2 text-sm font-medium text-gray-700">
+            Participants
+          </label>
           <div className="flex flex-wrap gap-2">
             {profiles.map((profile) => {
               const isSelected = formData.participants.includes(profile.id);
@@ -203,10 +320,10 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
                   type="button"
                   key={profile.id}
                   onClick={() => handleCheckboxChange(profile.id)}
-                  className={`px-3 py-1 rounded-full border text-sm ${
+                  className={`px-3 py-1 rounded-full border text-sm transition-colors ${
                     isSelected
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-800"
+                      ? "bg-blue-600 text-white border-blue-700"
+                      : "bg-gray-100 text-gray-800 border-gray-300 hover:bg-gray-200"
                   }`}
                 >
                   {profile.name} {profile.id === user?.id && "(You)"}
@@ -216,18 +333,39 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
           </div>
         </div>
 
-        <div className="p-3 bg-gray-50 rounded">
-          <p className="text-sm">Amount per person:</p>
-          <p className="text-xl font-bold">₹{amountPerPerson.toFixed(2)}</p>
+        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-sm text-gray-600">Amount per person:</p>
+          <p className="text-xl font-bold text-gray-800">
+            ₹{amountPerPerson.toFixed(2)}
+          </p>
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-gray-800 text-white py-2 rounded hover:bg-gray-700 disabled:opacity-50"
-        >
-          {loading ? "Adding..." : "Add Expense"}
-        </button>
+        <div className="flex gap-3">
+          {asPopup && (
+            <button
+              type="button"
+              onClick={() => {
+                resetForm();
+                setShowModal(false);
+                onCancel?.();
+              }}
+              className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className={`flex-1 px-4 py-2 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+              loading
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
+            }`}
+          >
+            {loading ? "Processing..." : "Add Expense"}
+          </button>
+        </div>
       </form>
     </>
   );
@@ -237,23 +375,37 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
       <>
         <button
           onClick={() => setShowModal(true)}
-          className="fixed bottom-6 right-6 bg-gray-800 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700"
+          className="fixed bottom-6 right-6 bg-blue-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-blue-700 transition-colors z-40"
+          aria-label="Add new expense"
         >
-          <span className="text-2xl">+</span>
+          <FaPlus className="text-xl" />
         </button>
 
         <div
           className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ${
             showModal ? "opacity-100" : "opacity-0 pointer-events-none"
           }`}
+          onClick={() => {
+            setShowModal(false);
+            resetForm();
+          }}
         >
-          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-4">
+          <div
+            className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Add Expense</h2>
+                <h2 className="text-xl font-semibold text-gray-800">
+                  Add New Expense
+                </h2>
                 <button
-                  onClick={() => setShowModal(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                  onClick={() => {
+                    setShowModal(false);
+                    resetForm();
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-2xl focus:outline-none"
+                  aria-label="Close"
                 >
                   &times;
                 </button>
@@ -267,8 +419,10 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
   }
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h2 className="text-xl font-semibold mb-4">Add Expense</h2>
+    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+      <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+        Add New Expense
+      </h2>
       {renderFormContent()}
     </div>
   );

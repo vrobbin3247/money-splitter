@@ -213,8 +213,10 @@ export default function Dashboard() {
     <div className="pb-6">
       {/* Header */}
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Expenses</h2>
-        <p className="text-gray-600">{expenses.length} total expenses</p>
+        <h2 className="text-2xl text-center font-bold text-gray-900 mb-2">
+          Your Expenses
+        </h2>
+        {/* <p className="text-gray-600">{expenses.length} total expenses</p> */}
       </div>
 
       {/* Expenses List */}
