@@ -225,7 +225,7 @@ export default function Dashboard() {
           return (
             <div
               key={expense.id}
-              className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 active:scale-[0.98] transition-all cursor-pointer ${
+              className={`bg-white rounded-2xl py-2.5 px-6 shadow-sm border border-gray-100 active:scale-[0.98] transition-all cursor-pointer ${
                 selectedExpenseId === expense.id
                   ? "ring-2 ring-blue-500 border-blue-200"
                   : "hover:shadow-md"

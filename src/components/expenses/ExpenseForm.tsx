@@ -15,6 +15,8 @@ interface ExpenseFormData {
 
 interface ExpenseFormProps {
   asPopup?: boolean;
+  onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
 export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
