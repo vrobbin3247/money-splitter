@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
+import { FaRupeeSign } from "react-icons/fa";
+import { FiUsers, FiX, FiUser, FiCalendar } from "react-icons/fi";
 
 interface Expense {
   id: string;
@@ -38,6 +40,7 @@ export default function Dashboard() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const { user } = useAuth();
 
+  // Your existing useEffect for fetching expenses
   useEffect(() => {
     async function fetchExpenses() {
       if (!user) {
@@ -46,7 +49,6 @@ export default function Dashboard() {
       }
 
       try {
-        // Fetch expenses where the user is the buyer
         const { data: buyerExpenses, error: buyerError } = await supabase
           .from("expenses")
           .select("*")
@@ -55,7 +57,6 @@ export default function Dashboard() {
 
         if (buyerError) throw buyerError;
 
-        // Fetch expenses where the user is a participant
         const { data: participantExpenses, error: participantError } =
           await supabase
             .from("expense_participants")
@@ -65,16 +66,11 @@ export default function Dashboard() {
 
         if (participantError) throw participantError;
 
-        // Flatten participantExpenses into expenses
-        type ExpenseParticipant = {
-          expenses: Expense[];
-        };
-
+        type ExpenseParticipant = { expenses: Expense[] };
         const participantExpenseList: Expense[] = (
           participantExpenses as ExpenseParticipant[]
         ).flatMap((p) => p.expenses ?? []);
 
-        // Merge and dedupe by expense ID
         const combined = [...(buyerExpenses || []), ...participantExpenseList];
         const uniqueExpenses: Expense[] = Object.values(
           combined.reduce((acc, exp) => {
@@ -83,7 +79,6 @@ export default function Dashboard() {
           }, {} as Record<string, Expense>)
         );
 
-        // Sort by created_at descending
         uniqueExpenses.sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
@@ -100,6 +95,7 @@ export default function Dashboard() {
     fetchExpenses();
   }, [user]);
 
+  // Your existing useEffect for fetching expense details
   useEffect(() => {
     async function fetchExpenseDetails() {
       if (!selectedExpenseId) {
@@ -109,7 +105,6 @@ export default function Dashboard() {
 
       setDetailsLoading(true);
       try {
-        // Fetch expense data
         const { data: expenseData, error: expenseError } = await supabase
           .from("expenses")
           .select("*")
@@ -118,7 +113,6 @@ export default function Dashboard() {
 
         if (expenseError) throw expenseError;
 
-        // Fetch the buyer's profile
         let buyerName: string = "Unknown";
         if (expenseData?.buyer_id) {
           const { data: profileData, error: profileError } = await supabase
@@ -134,30 +128,26 @@ export default function Dashboard() {
           }
         }
 
-        // Fetch all participants with their names
         const { data: participantsData, error: participantsError } =
           await supabase
             .from("expense_participants")
             .select(
               `
-              participant_id,
-              profiles!inner(name)
-            `
+            participant_id,
+            profiles!inner(name)
+          `
             )
             .eq("expense_id", selectedExpenseId);
 
         if (participantsError) throw participantsError;
 
-        // Transform participants data to include names
         const participantsWithNames: Participant[] =
           participantsData?.map((p: any) => ({
             participant_id: p.participant_id,
             name: p.profiles?.name || "Unknown",
           })) || [];
 
-        // Calculate total participants correctly
         const participantNames = participantsWithNames.map((p) => p.name);
-        // Use Set to get unique participants (handles case where buyer is also in participants table)
         const uniqueParticipants = new Set([buyerName, ...participantNames]);
         const totalParticipants = uniqueParticipants.size;
 
@@ -177,92 +167,236 @@ export default function Dashboard() {
     fetchExpenseDetails();
   }, [selectedExpenseId]);
 
+  // Helper function to format dates
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return "Today";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    } else {
+      return date.toLocaleDateString("en-IN", {
+        month: "short",
+        day: "numeric",
+      });
+    }
+  };
+
   if (loading) {
-    return <p className="text-gray-600 text-sm">Loading expenses...</p>;
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading expenses...</p>
+        </div>
+      </div>
+    );
   }
 
   if (expenses.length === 0) {
-    return <p className="text-gray-600 text-sm">No expenses yet.</p>;
+    return (
+      <div className="text-center py-20">
+        <FaRupeeSign className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">
+          No expenses yet
+        </h3>
+        <p className="text-gray-600 mb-6">Start by adding your first expense</p>
+      </div>
+    );
   }
 
   return (
-    <div className="mt-6 grid grid-cols-1 gap-4">
-      {expenses.map((expense) => (
-        <div
-          key={expense.id}
-          className="rounded-xl border border-gray-200 p-4 shadow-sm bg-white hover:shadow-md transition cursor-pointer"
-          onClick={() => setSelectedExpenseId(expense.id)}
-        >
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="font-semibold text-lg">{expense.title}</h3>
-            </div>
-            <div className="text-right">
-              <p className="text-green-600 font-bold text-lg">
-                ₹{expense.amount}
-              </p>
-              <p className="text-xs text-gray-500">
-                {new Date(expense.created_at).toLocaleDateString()}
-              </p>
-            </div>
-          </div>
-        </div>
-      ))}
+    <div className="pb-6">
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Expenses</h2>
+        <p className="text-gray-600">{expenses.length} total expenses</p>
+      </div>
 
-      {selectedExpenseDetails && (
-        <div className="mt-4 p-4 border rounded-xl bg-white shadow-md">
-          {detailsLoading ? (
-            <p className="text-gray-600">Loading expense details...</p>
-          ) : (
-            <>
-              <h3 className="font-semibold text-lg mb-3">Expense Details</h3>
-              <div className="space-y-2">
-                <p>
-                  <span className="font-medium">Title:</span>{" "}
-                  {selectedExpenseDetails.title}
-                </p>
-                <p>
-                  <span className="font-medium">Amount:</span> ₹
-                  {selectedExpenseDetails.amount}
-                </p>
-                <p>
-                  <span className="font-medium">Buyer:</span>{" "}
-                  {selectedExpenseDetails.buyer_name}
-                </p>
-                <p>
-                  <span className="font-medium">Participants:</span>{" "}
-                  {(() => {
-                    // Get all participant names from expense_participants table
-                    const participantNames =
-                      selectedExpenseDetails.participants.map((p) => p.name);
-                    // Create a set to avoid duplicates, then add buyer
-                    const allParticipantsSet = new Set([
-                      selectedExpenseDetails.buyer_name,
-                      ...participantNames,
-                    ]);
-                    return Array.from(allParticipantsSet).join(", ");
-                  })()}
-                </p>
-                <p>
-                  <span className="font-medium">Total People:</span>{" "}
-                  {selectedExpenseDetails.total_participants}
-                </p>
-                <p className="text-lg font-semibold text-blue-600">
-                  <span className="font-medium">Your Share:</span> ₹
-                  {(
-                    selectedExpenseDetails.amount /
-                    selectedExpenseDetails.total_participants
-                  ).toFixed(2)}
-                </p>
+      {/* Expenses List */}
+      <div className="space-y-4">
+        {expenses.map((expense) => {
+          const isUserBuyer = expense.buyer_id === user?.id;
+
+          return (
+            <div
+              key={expense.id}
+              className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 active:scale-[0.98] transition-all cursor-pointer ${
+                selectedExpenseId === expense.id
+                  ? "ring-2 ring-blue-500 border-blue-200"
+                  : "hover:shadow-md"
+              }`}
+              onClick={() => setSelectedExpenseId(expense.id)}
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900 text-lg mb-2 truncate">
+                    {expense.title}
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    {isUserBuyer ? (
+                      <span className="text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">
+                        You paid
+                      </span>
+                    ) : (
+                      <span className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium">
+                        Split expense
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <FiCalendar className="w-3 h-3" />
+                      {formatDate(expense.created_at)}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-right ml-4">
+                  <div className="text-2xl font-bold text-gray-900">
+                    ₹{expense.amount.toLocaleString()}
+                  </div>
+                  <div className="text-sm text-blue-600 font-medium mt-1">
+                    View split
+                  </div>
+                </div>
               </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mobile-Optimized Details Modal */}
+      {selectedExpenseDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
+          <div className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center rounded-t-3xl">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Expense Details
+              </h2>
               <button
                 onClick={() => setSelectedExpenseId(null)}
-                className="mt-3 px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition"
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
-                Close Details
+                <FiX className="w-6 h-6 text-gray-600" />
               </button>
-            </>
-          )}
+            </div>
+
+            {detailsLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading details...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="px-6 py-6 space-y-6">
+                {/* Expense Overview */}
+                <div className="text-center">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                    {selectedExpenseDetails.title}
+                  </h3>
+                  <div className="text-4xl font-bold text-green-600 mb-2">
+                    ₹{selectedExpenseDetails.amount.toLocaleString()}
+                  </div>
+                  <div className="text-gray-600 flex items-center justify-center gap-1">
+                    <FiCalendar className="w-4 h-4" />
+                    {formatDate(selectedExpenseDetails.created_at)}
+                  </div>
+                </div>
+
+                {/* Your Share & People Count */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 rounded-2xl p-4 text-center">
+                    <FaRupeeSign className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+                    <div className="text-3xl font-bold text-blue-600">
+                      {(
+                        selectedExpenseDetails.amount /
+                        selectedExpenseDetails.total_participants
+                      ).toFixed(0)}
+                    </div>
+                    <div className="text-sm text-blue-700">Your Share</div>
+                  </div>
+
+                  <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                    <FiUsers className="w-6 h-6 text-gray-600 mx-auto mb-2" />
+                    <div className="text-3xl font-bold text-gray-600">
+                      {selectedExpenseDetails.total_participants}
+                    </div>
+                    <div className="text-sm text-gray-700">People</div>
+                  </div>
+                </div>
+
+                {/* Who Paid */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-gray-900 text-lg">
+                    Paid by
+                  </h4>
+                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-2xl">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <FiUser className="w-6 h-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-semibold text-green-900">
+                        {selectedExpenseDetails.buyer_name}
+                      </div>
+                      <div className="text-sm text-green-700">
+                        Paid ₹{selectedExpenseDetails.amount.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Split Details */}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-gray-900 text-lg">
+                    Split between
+                  </h4>
+                  <div className="space-y-3">
+                    {Array.from(
+                      new Set([
+                        selectedExpenseDetails.buyer_name,
+                        ...selectedExpenseDetails.participants.map(
+                          (p) => p.name
+                        ),
+                      ])
+                    ).map((name, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                            <FiUser className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <span className="font-medium text-gray-900">
+                            {name}
+                          </span>
+                        </div>
+                        <span className="font-semibold text-gray-900">
+                          ₹
+                          {(
+                            selectedExpenseDetails.amount /
+                            selectedExpenseDetails.total_participants
+                          ).toFixed(0)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => setSelectedExpenseId(null)}
+                  className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-semibold text-lg hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -45,23 +45,35 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
     calculateAmountPerPerson();
   }, [formData.amount, formData.participants]);
 
-  const fetchProfiles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, name");
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowModal(false);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, []);
 
-      if (error) throw error;
-      setProfiles(data || []);
-    } catch (err) {
-      setError("Failed to fetch profiles");
-      console.error(err);
+  useEffect(() => {
+    if (showModal) {
+      setTimeout(() => {
+        document.getElementById("title")?.focus();
+      }, 100); // small delay for modal to render
     }
+  }, [showModal]);
+
+  const fetchProfiles = async () => {
+    const { data, error } = await supabase.from("profiles").select("id, name");
+    if (error) {
+      setError("Failed to fetch profiles");
+      console.error(error);
+      return;
+    }
+    setProfiles(data || []);
   };
 
   const calculateAmountPerPerson = () => {
-    const participantCount = formData.participants.length || 1;
-    setAmountPerPerson(formData.amount / participantCount);
+    const count = formData.participants.length || 1;
+    setAmountPerPerson(formData.amount / count);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -74,10 +86,10 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
 
   const handleCheckboxChange = (profileId: string) => {
     setFormData((prev) => {
-      const newParticipants = prev.participants.includes(profileId)
+      const updated = prev.participants.includes(profileId)
         ? prev.participants.filter((id) => id !== profileId)
         : [...prev.participants, profileId];
-      return { ...prev, participants: newParticipants };
+      return { ...prev, participants: updated };
     });
   };
 
@@ -93,9 +105,7 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
         formData.amount <= 0 ||
         formData.participants.length === 0
       ) {
-        throw new Error(
-          "Please fill all fields and select at least one participant"
-        );
+        throw new Error("Please fill all fields and select participants");
       }
 
       const { data: expense, error: expenseError } = await supabase
@@ -110,16 +120,13 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
 
       if (expenseError) throw expenseError;
 
-      // NEW CHECK: Ensure the user is the buyer before adding participants
       if (expense.buyer_id !== user?.id) {
-        throw new Error(
-          "You are not authorized to add participants to this expense."
-        );
+        throw new Error("You're not authorized to add participants");
       }
 
-      const participantsData = formData.participants.map((participantId) => ({
+      const participantsData = formData.participants.map((id) => ({
         expense_id: expense.id,
-        participant_id: participantId,
+        participant_id: id,
       }));
 
       const { error: participantsError } = await supabase
@@ -132,151 +139,135 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
       setFormData({
         title: "",
         amount: 0,
-        participants: [],
+        participants: user ? [user.id] : [],
       });
 
-      if (asPopup) {
-        setTimeout(() => setShowModal(false), 1500);
-      }
+      if (asPopup) setTimeout(() => setShowModal(false), 1500);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create expense");
+      setError(err instanceof Error ? err.message : "Error creating expense");
     } finally {
       setLoading(false);
     }
   };
+
+  const renderFormContent = () => (
+    <>
+      {error && <p className="text-red-600">{error}</p>}
+      {success && (
+        <div className="flex items-center gap-2 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          = <span>Expense added successfully!</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="title" className="block mb-1 text-sm font-medium">
+            Title
+          </label>
+          <input
+            id="title"
+            name="title"
+            value={formData.title}
+            onChange={handleInputChange}
+            placeholder="What was this expense for?"
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="amount" className="block mb-1 text-sm font-medium">
+            Amount
+          </label>
+          <input
+            id="amount"
+            name="amount"
+            type="number"
+            min="1"
+            value={formData.amount || ""}
+            onChange={handleInputChange}
+            required
+            className="w-full border rounded p-2"
+          />
+        </div>
+
+        <div>
+          <label className="block mb-1 text-sm font-medium">Participants</label>
+          <div className="flex flex-wrap gap-2">
+            {profiles.map((profile) => {
+              const isSelected = formData.participants.includes(profile.id);
+              return (
+                <button
+                  type="button"
+                  key={profile.id}
+                  onClick={() => handleCheckboxChange(profile.id)}
+                  className={`px-3 py-1 rounded-full border text-sm ${
+                    isSelected
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {profile.name} {profile.id === user?.id && "(You)"}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="p-3 bg-gray-50 rounded">
+          <p className="text-sm">Amount per person:</p>
+          <p className="text-xl font-bold">₹{amountPerPerson.toFixed(2)}</p>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-gray-800 text-white py-2 rounded hover:bg-gray-700 disabled:opacity-50"
+        >
+          {loading ? "Adding..." : "Add Expense"}
+        </button>
+      </form>
+    </>
+  );
 
   if (asPopup) {
     return (
       <>
         <button
           onClick={() => setShowModal(true)}
-          className="fixed bottom-6 right-6 bg-gray-800 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700 transition-colors z-50"
+          className="fixed bottom-6 right-6 bg-gray-800 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg hover:bg-gray-700"
         >
           <span className="text-2xl">+</span>
         </button>
 
-        {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-bold">Add New Expense</h2>
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    &times;
-                  </button>
-                </div>
-                {renderFormContent()}
+        <div
+          className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 transition-opacity duration-300 ${
+            showModal ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-4">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Add Expense</h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  &times;
+                </button>
               </div>
+              {renderFormContent()}
             </div>
           </div>
-        )}
+        </div>
       </>
     );
   }
 
   return (
     <div className="max-w-md mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">Add New Expense</h2>
+      <h2 className="text-xl font-semibold mb-4">Add Expense</h2>
       {renderFormContent()}
     </div>
   );
-
-  function renderFormContent() {
-    return (
-      <>
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-            Expense added successfully!
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label
-              htmlFor="title"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Title
-            </label>
-            <input
-              id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
-              placeholder="What was this expense for?"
-              required
-            />
-          </div>
-
-          <div>
-            <label
-              htmlFor="amount"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Amount
-            </label>
-            <input
-              id="amount"
-              name="amount"
-              type="number"
-              min="1"
-              step="1"
-              value={formData.amount || ""}
-              onChange={handleInputChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"
-              placeholder="0"
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Participants
-            </label>
-            <div className="space-y-2">
-              {profiles.map((profile) => (
-                <div key={profile.id} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id={`participant-${profile.id}`}
-                    checked={formData.participants.includes(profile.id)}
-                    onChange={() => handleCheckboxChange(profile.id)}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <label
-                    htmlFor={`participant-${profile.id}`}
-                    className="text-sm text-gray-700"
-                  >
-                    {profile.name} {profile.id === user?.id && "(You)"}
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <p className="font-medium">Amount per person:</p>
-            <p className="text-xl font-bold">₹{amountPerPerson.toFixed(2)}</p>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50"
-          >
-            {loading ? "Processing..." : "Add Expense"}
-          </button>
-        </form>
-      </>
-    );
-  }
 }
