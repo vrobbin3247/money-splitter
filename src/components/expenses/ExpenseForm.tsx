@@ -126,6 +126,8 @@ export default function ExpenseForm({ asPopup = false }: ExpenseFormProps) {
         .from("expense_participants")
         .insert(participantsData);
 
+      if (participantsError) throw participantsError;
+
       setSuccess(true);
       setFormData({
         title: "",

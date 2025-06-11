@@ -2,8 +2,17 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 
+interface Expense {
+  id: string;
+  title: string;
+  amount: number;
+  buyer_id: string;
+  created_at: string;
+  [key: string]: any;
+}
+
 export default function Dashboard() {
-  const [expenses, setExpenses] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
 
@@ -35,16 +44,21 @@ export default function Dashboard() {
         if (participantError) throw participantError;
 
         // Flatten participantExpenses into expenses
-        const participantExpenseList =
-          participantExpenses?.map((p) => p.expenses) || [];
+        type ExpenseParticipant = {
+          expenses: Expense[]; // NOTE: this is an array
+        };
+
+        const participantExpenseList: Expense[] = (
+          participantExpenses as ExpenseParticipant[]
+        ).flatMap((p) => p.expenses ?? []);
 
         // Merge and dedupe by expense ID
         const combined = [...(buyerExpenses || []), ...participantExpenseList];
-        const uniqueExpenses = Object.values(
+        const uniqueExpenses: Expense[] = Object.values(
           combined.reduce((acc, exp) => {
             acc[exp.id] = exp;
             return acc;
-          }, {} as Record<string, any>)
+          }, {} as Record<string, Expense>)
         );
 
         // Sort by created_at descending

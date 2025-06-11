@@ -2,13 +2,13 @@ import { useAuth } from "./context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import ExpenseForm from "../src/components/expenses/ExpenseForm";
 import Dashboard from "../src/components/expenses/Dashboard";
-import { useState } from "react";
+// import { useState } from "react";
 import { FiUser } from "react-icons/fi";
 
 export default function Home() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
-  const [showForm, setShowForm] = useState(false);
+  // const [showForm, setShowForm] = useState(false);
 
   const handleLogout = async () => {
     await signOut();
