@@ -1,16 +1,8 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
-import {
-  FaUtensils,
-  FaTaxi,
-  FaHome,
-  FaLightbulb,
-  FaEllipsisH,
-  FaPlus,
-  FaTimes,
-  FaCheck,
-} from "react-icons/fa";
+import { FaPlus, FaTimes, FaCheck } from "react-icons/fa";
+import { categories } from "../constants/categories";
 // import { GiMoneyStack } from "react-icons/gi";
 import { FaIndianRupeeSign } from "react-icons/fa6";
 
@@ -50,34 +42,6 @@ export default function ExpenseForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [showModal, setShowModal] = useState(false);
-
-  const categories = [
-    {
-      value: "food",
-      label: "Food",
-      icon: <FaUtensils className="text-red-500" />,
-    },
-    {
-      value: "travel",
-      label: "Travel",
-      icon: <FaTaxi className="text-blue-500" />,
-    },
-    {
-      value: "rent",
-      label: "Rent",
-      icon: <FaHome className="text-green-500" />,
-    },
-    {
-      value: "utilities",
-      label: "Utilities",
-      icon: <FaLightbulb className="text-yellow-500" />,
-    },
-    {
-      value: "misc",
-      label: "misc",
-      icon: <FaEllipsisH className="text-gray-500" />,
-    },
-  ];
 
   useEffect(() => {
     if (user?.id) {
@@ -419,10 +383,7 @@ export default function ExpenseForm({
   }
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
-      {/* <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-        Add New Expense
-      </h2> */}
+    <div className="p-6 bg-white rounded-lg shadow-md">
       {renderFormContent()}
     </div>
   );

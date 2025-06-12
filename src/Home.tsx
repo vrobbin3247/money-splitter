@@ -2,15 +2,18 @@ import { useAuth } from "./context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import ExpenseForm from "../src/components/expenses/ExpenseForm";
 import Dashboard from "../src/components/expenses/Dashboard";
+import BottomNavigation from "./components/ui/BottomNavigation";
 import { useState } from "react";
 import { FiUser, FiPlus, FiLogOut } from "react-icons/fi";
 import { FaChevronDown } from "react-icons/fa";
 import Modal from "./components/ui/Modal";
+
 export default function Home() {
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const [showForm, setShowForm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [activeTab, setActiveTab] = useState("expenses");
 
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to logout?")) {
@@ -19,16 +22,58 @@ export default function Home() {
     }
   };
 
+  const renderContent = () => {
+    switch (activeTab) {
+      case "expenses":
+        return <Dashboard />;
+      case "balances":
+        return (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Balances
+            </h3>
+            <p className="text-gray-600">Coming soon...</p>
+          </div>
+        );
+      case "insights":
+        return (
+          <div className="text-center py-12">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Insights
+            </h3>
+            <p className="text-gray-600">Coming soon...</p>
+          </div>
+        );
+      default:
+        return <Dashboard />;
+    }
+  };
+
+  const getPageTitle = () => {
+    switch (activeTab) {
+      case "expenses":
+        return { title: "Expenses", subtitle: "Split & track with roommates" };
+      case "balances":
+        return { title: "Balances", subtitle: "Who owes what" };
+      case "insights":
+        return { title: "Insights", subtitle: "Analytics & trends" };
+      default:
+        return { title: "Expenses", subtitle: "Split & track with roommates" };
+    }
+  };
+
+  const pageInfo = getPageTitle();
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Fixed Header */}
       <div className="sticky top-0 bg-white border-b border-gray-200 z-40">
         <div className="px-4 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Expenses</h1>
-            <p className="text-sm text-gray-600">
-              Split & track with roommates
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {pageInfo.title}
+            </h1>
+            <p className="text-sm text-gray-600">{pageInfo.subtitle}</p>
           </div>
           <button
             onClick={() => setShowProfile(true)}
@@ -39,19 +84,23 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="px-4 pt-6 pb-24">
-        <Dashboard />
-      </div>
+      {/* Main Content with bottom padding for nav */}
+      <div className="px-4 pt-6 pb-24 mb-16">{renderContent()}</div>
 
-      {/* Floating Action Button */}
-      <button
-        onClick={() => setShowForm(true)}
-        className="fixed bottom-6 right-6 w-16 h-16 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 active:scale-95 transition-all z-40 flex items-center justify-center"
-      >
-        <FiPlus className="w-8 h-8" />
-      </button>
+      {/* Floating Action Button - only show on expenses tab */}
+      {activeTab === "expenses" && (
+        <button
+          onClick={() => setShowForm(true)}
+          className="fixed bottom-20 right-6 w-16 h-16 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 active:scale-95 transition-all z-40 flex items-center justify-center"
+        >
+          <FiPlus className="w-8 h-8" />
+        </button>
+      )}
 
+      {/* Bottom Navigation */}
+      <BottomNavigation activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Profile Modal */}
       <Modal isOpen={showProfile} onClose={() => setShowProfile(false)}>
         <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex justify-between items-center rounded-t-3xl">
           <h2 className="text-xl font-semibold text-gray-900">Profile</h2>
@@ -109,16 +158,14 @@ export default function Home() {
           </button>
         </div>
 
-        <div className="p-4">
-          <ExpenseForm
-            asPopup={false}
-            onSuccess={() => {
-              setShowForm(false);
-              window.location.reload(); // optional
-            }}
-            onCancel={() => setShowForm(false)}
-          />
-        </div>
+        <ExpenseForm
+          asPopup={false}
+          onSuccess={() => {
+            setShowForm(false);
+            window.location.reload(); // optional
+          }}
+          onCancel={() => setShowForm(false)}
+        />
       </Modal>
     </div>
   );
