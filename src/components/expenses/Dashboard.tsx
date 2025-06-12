@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { FaRupeeSign } from "react-icons/fa";
 import { FiUsers, FiX, FiUser, FiCalendar } from "react-icons/fi";
+import Modal from "../ui/Modal";
 
 interface Expense {
   id: string;
@@ -270,10 +271,13 @@ export default function Dashboard() {
       </div>
 
       {/* Mobile-Optimized Details Modal */}
-      {selectedExpenseDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end">
-          <div className="bg-white rounded-t-3xl w-full max-h-[85vh] overflow-y-auto">
-            {/* Modal Header */}
+      <Modal
+        isOpen={!!selectedExpenseId}
+        onClose={() => setSelectedExpenseId(null)}
+      >
+        {selectedExpenseDetails && !detailsLoading ? (
+          <>
+            {/* Custom Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center rounded-t-3xl">
               <h2 className="text-xl font-semibold text-gray-900">
                 Expense Details
@@ -286,121 +290,115 @@ export default function Dashboard() {
               </button>
             </div>
 
-            {detailsLoading ? (
-              <div className="flex items-center justify-center py-20">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Loading details...</p>
+            <div className="px-6 py-6 space-y-6">
+              {/* Expense Overview */}
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                  {selectedExpenseDetails.title}
+                </h3>
+                <div className="text-4xl font-bold text-green-600 mb-2">
+                  ₹{selectedExpenseDetails.amount.toLocaleString()}
+                </div>
+                <div className="text-gray-600 flex items-center justify-center gap-1">
+                  <FiCalendar className="w-4 h-4" />
+                  {formatDate(selectedExpenseDetails.created_at)}
                 </div>
               </div>
-            ) : (
-              <div className="px-6 py-6 space-y-6">
-                {/* Expense Overview */}
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    {selectedExpenseDetails.title}
-                  </h3>
-                  <div className="text-4xl font-bold text-green-600 mb-2">
-                    ₹{selectedExpenseDetails.amount.toLocaleString()}
+
+              {/* Your Share & People Count */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50 rounded-2xl p-4 text-center">
+                  <FaRupeeSign className="w-6 h-6 text-blue-600 mx-auto mb-2" />
+                  <div className="text-3xl font-bold text-blue-600">
+                    {(
+                      selectedExpenseDetails.amount /
+                      selectedExpenseDetails.total_participants
+                    ).toFixed(0)}
                   </div>
-                  <div className="text-gray-600 flex items-center justify-center gap-1">
-                    <FiCalendar className="w-4 h-4" />
-                    {formatDate(selectedExpenseDetails.created_at)}
-                  </div>
+                  <div className="text-sm text-blue-700">Your Share</div>
                 </div>
 
-                {/* Your Share & People Count */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 rounded-2xl p-4 text-center">
-                    <FaRupeeSign className="w-6 h-6 text-blue-600 mx-auto mb-2" />
-                    <div className="text-3xl font-bold text-blue-600">
-                      {(
-                        selectedExpenseDetails.amount /
-                        selectedExpenseDetails.total_participants
-                      ).toFixed(0)}
-                    </div>
-                    <div className="text-sm text-blue-700">Your Share</div>
+                <div className="bg-gray-50 rounded-2xl p-4 text-center">
+                  <FiUsers className="w-6 h-6 text-gray-600 mx-auto mb-2" />
+                  <div className="text-3xl font-bold text-gray-600">
+                    {selectedExpenseDetails.total_participants}
                   </div>
+                  <div className="text-sm text-gray-700">People</div>
+                </div>
+              </div>
 
-                  <div className="bg-gray-50 rounded-2xl p-4 text-center">
-                    <FiUsers className="w-6 h-6 text-gray-600 mx-auto mb-2" />
-                    <div className="text-3xl font-bold text-gray-600">
-                      {selectedExpenseDetails.total_participants}
+              {/* Who Paid */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-900 text-lg">Paid by</h4>
+                <div className="flex items-center gap-3 p-4 bg-green-50 rounded-2xl">
+                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                    <FiUser className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-semibold text-green-900">
+                      {selectedExpenseDetails.buyer_name}
                     </div>
-                    <div className="text-sm text-gray-700">People</div>
+                    <div className="text-sm text-green-700">
+                      Paid ₹{selectedExpenseDetails.amount.toLocaleString()}
+                    </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Who Paid */}
+              {/* Split Details */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-gray-900 text-lg">
+                  Split between
+                </h4>
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-gray-900 text-lg">
-                    Paid by
-                  </h4>
-                  <div className="flex items-center gap-3 p-4 bg-green-50 rounded-2xl">
-                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                      <FiUser className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-semibold text-green-900">
-                        {selectedExpenseDetails.buyer_name}
-                      </div>
-                      <div className="text-sm text-green-700">
-                        Paid ₹{selectedExpenseDetails.amount.toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Split Details */}
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-gray-900 text-lg">
-                    Split between
-                  </h4>
-                  <div className="space-y-3">
-                    {Array.from(
-                      new Set([
-                        selectedExpenseDetails.buyer_name,
-                        ...selectedExpenseDetails.participants.map(
-                          (p) => p.name
-                        ),
-                      ])
-                    ).map((name, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                            <FiUser className="w-5 h-5 text-gray-600" />
-                          </div>
-                          <span className="font-medium text-gray-900">
-                            {name}
-                          </span>
+                  {Array.from(
+                    new Set([
+                      selectedExpenseDetails.buyer_name,
+                      ...selectedExpenseDetails.participants.map((p) => p.name),
+                    ])
+                  ).map((name, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          <FiUser className="w-5 h-5 text-gray-600" />
                         </div>
-                        <span className="font-semibold text-gray-900">
-                          ₹
-                          {(
-                            selectedExpenseDetails.amount /
-                            selectedExpenseDetails.total_participants
-                          ).toFixed(0)}
+                        <span className="font-medium text-gray-900">
+                          {name}
                         </span>
                       </div>
-                    ))}
-                  </div>
+                      <span className="font-semibold text-gray-900">
+                        ₹
+                        {(
+                          selectedExpenseDetails.amount /
+                          selectedExpenseDetails.total_participants
+                        ).toFixed(0)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-
-                {/* Close Button */}
-                <button
-                  onClick={() => setSelectedExpenseId(null)}
-                  className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-semibold text-lg hover:bg-gray-200 transition-colors"
-                >
-                  Close
-                </button>
               </div>
-            )}
+
+              {/* Close Button */}
+              <button
+                onClick={() => setSelectedExpenseId(null)}
+                className="w-full bg-gray-100 text-gray-700 py-4 rounded-2xl font-semibold text-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-center">
+              <div className="animate-spin  rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading details...</p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

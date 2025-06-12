@@ -73,8 +73,8 @@ export default function ExpenseForm({
       icon: <FaLightbulb className="text-yellow-500" />,
     },
     {
-      value: "other",
-      label: "Other",
+      value: "misc",
+      label: "misc",
       icon: <FaEllipsisH className="text-gray-500" />,
     },
   ];
@@ -135,7 +135,7 @@ export default function ExpenseForm({
   };
 
   const handleCategoryChange = (
-    category: "food" | "travel" | "rent" | "utilities" | "other"
+    category: "food" | "travel" | "rent" | "utilities" | "misc"
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -195,7 +195,7 @@ export default function ExpenseForm({
       setFormData({
         title: "",
         amount: 0,
-        category: "other",
+        category: "misc",
         participants: user ? [user.id] : [],
       });
 
@@ -218,7 +218,7 @@ export default function ExpenseForm({
     setFormData({
       title: "",
       amount: 0,
-      category: "other",
+      category: "misc",
       participants: user ? [user.id] : [],
     });
     setError(null);
@@ -396,9 +396,9 @@ export default function ExpenseForm({
           >
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-800">
+                {/* <h2 className="text-xl font-semibold text-gray-800">
                   Add New Expense
-                </h2>
+                </h2> */}
                 <button
                   onClick={() => {
                     setShowModal(false);
@@ -420,9 +420,9 @@ export default function ExpenseForm({
 
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+      {/* <h2 className="text-2xl font-semibold text-gray-800 mb-6">
         Add New Expense
-      </h2>
+      </h2> */}
       {renderFormContent()}
     </div>
   );
