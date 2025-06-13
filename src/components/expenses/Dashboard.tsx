@@ -50,17 +50,17 @@ export default function Dashboard() {
   };
 
   // Helper function to get all participants for an expense
-  const getAllParticipants = (expense: Expense) => {
-    if (expense.participants && expense.buyer_name) {
-      return Array.from(
-        new Set([
-          expense.buyer_name,
-          ...expense.participants.map((p: any) => p.name),
-        ])
-      );
-    }
-    return [];
-  };
+  // const getAllParticipants = (expense: Expense) => {
+  //   if (expense.participants && expense.buyer_name) {
+  //     return Array.from(
+  //       new Set([
+  //         expense.buyer_name,
+  //         ...expense.participants.map((p: any) => p.name),
+  //       ])
+  //     );
+  //   }
+  //   return [];
+  // };
 
   useEffect(() => {
     async function fetchExpenses() {
