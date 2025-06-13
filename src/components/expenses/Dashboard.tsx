@@ -527,7 +527,6 @@ export default function Dashboard() {
       <div className="space-y-4">
         {expenses.map((expense) => {
           const isUserBuyer = expense.buyer_id === user?.id;
-          const allParticipants = getAllParticipants(expense);
 
           return (
             <div
