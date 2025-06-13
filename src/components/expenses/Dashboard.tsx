@@ -550,23 +550,25 @@ export default function Dashboard() {
 
                   {/* Content */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
-                      {expense.title}
-                    </h3>
-
-                    <div className="flex items-center space-x-3">
-                      {/* Payment status badge */}
+                    <div className="flex gap-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
+                        {expense.title}
+                      </h3>
                       <div className="flex-shrink-0">
                         {isUserBuyer ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            You paid
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            paid
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                            Split expense
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            Split
                           </span>
                         )}
                       </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {/* Payment status badge */}
 
                       {/* Participants count */}
                       {expense.total_participants &&

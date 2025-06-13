@@ -9,23 +9,13 @@ import {
   FiUsers,
   FiUser,
 } from "react-icons/fi";
-import { FaRupeeSign } from "react-icons/fa";
+// import { FaRupeeSign } from "react-icons/fa";
 import { supabase } from "../../lib/supabase";
 import Modal from "../ui/Modal";
 
 interface BalancesProps {
   user: { id: string };
 }
-
-// interface Expense {
-//   id: string;
-//   title: string;
-//   amount: number;
-//   buyer_id: string;
-//   created_at: string;
-//   category: string;
-//   profiles: { name: string };
-// }
 
 interface Balance {
   id: string;
@@ -38,6 +28,7 @@ interface Balance {
     total: number;
     yourShare: number;
     paidBy: string;
+    upi_id: string;
     category: string;
   }[];
 }
@@ -285,92 +276,92 @@ const Balances = ({ user }: BalancesProps) => {
     );
   };
 
-  interface QuickStatsProps {
-    balance: Balance;
-  }
+  // interface QuickStatsProps {
+  //   balance: Balance;
+  // }
 
-  const QuickStats = ({ balance }: QuickStatsProps) => (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-            <FiUsers className="w-5 h-5 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-blue-600">
-              {balance.breakdown.length}
-            </div>
-            <div className="text-xs text-blue-700 font-medium">
-              Shared expenses
-            </div>
-          </div>
-        </div>
-      </div>
+  // const QuickStats = ({ balance }: QuickStatsProps) => (
+  //   <div className="grid grid-cols-2 gap-3">
+  //     <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+  //       <div className="flex items-center gap-3">
+  //         <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+  //           <FiUsers className="w-5 h-5 text-blue-600" />
+  //         </div>
+  //         <div>
+  //           <div className="text-2xl font-bold text-blue-600">
+  //             {balance.breakdown.length}
+  //           </div>
+  //           <div className="text-xs text-blue-700 font-medium">
+  //             Shared expenses
+  //           </div>
+  //         </div>
+  //       </div>
+  //     </div>
 
-      <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-            <FaRupeeSign className="w-5 h-5 text-purple-600" />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-purple-600">
-              {(Math.abs(balance.amount) / balance.breakdown.length).toFixed(0)}
-            </div>
-            <div className="text-xs text-purple-700 font-medium">
-              Avg per expense
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  //     <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
+  //       <div className="flex items-center gap-3">
+  //         <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+  //           <FaRupeeSign className="w-5 h-5 text-purple-600" />
+  //         </div>
+  //         <div>
+  //           <div className="text-2xl font-bold text-purple-600">
+  //             {(Math.abs(balance.amount) / balance.breakdown.length).toFixed(0)}
+  //           </div>
+  //           <div className="text-xs text-purple-700 font-medium">
+  //             Avg per expense
+  //           </div>
+  //         </div>
+  //       </div>
+  //     </div>
+  //   </div>
+  // );
 
-  interface PersonInfoProps {
-    balance: Balance;
-  }
+  // interface PersonInfoProps {
+  //   balance: Balance;
+  // }
 
-  const PersonInfo = ({ balance }: PersonInfoProps) => (
-    <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-          <FiUser className="w-4 h-4 text-blue-600" />
-        </div>
-        <h4 className="font-semibold text-gray-900">Person Details</h4>
-      </div>
+  // const PersonInfo = ({ balance }: PersonInfoProps) => (
+  //   <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+  //     <div className="flex items-center gap-2 mb-4">
+  //       <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
+  //         <FiUser className="w-4 h-4 text-blue-600" />
+  //       </div>
+  //       <h4 className="font-semibold text-gray-900">Person Details</h4>
+  //     </div>
 
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center border-2 border-blue-200">
-              <span className="text-lg font-bold text-blue-700">
-                {balance.user.avatar}
-              </span>
-            </div>
-            <div>
-              <div className="font-semibold text-gray-900">
-                {balance.user.name}
-              </div>
-              <div className="text-sm text-gray-500">
-                {balance.type === "owe"
-                  ? "You owe this person"
-                  : "This person owes you"}
-              </div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div
-              className={`text-lg font-bold ${
-                balance.type === "owe" ? "text-red-600" : "text-green-600"
-              }`}
-            >
-              ₹{Math.abs(balance.amount).toLocaleString()}
-            </div>
-            <div className="text-xs text-gray-500">Total balance</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  //     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+  //       <div className="flex items-center justify-between">
+  //         <div className="flex items-center gap-3">
+  //           <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center border-2 border-blue-200">
+  //             <span className="text-lg font-bold text-blue-700">
+  //               {balance.user.avatar}
+  //             </span>
+  //           </div>
+  //           <div>
+  //             <div className="font-semibold text-gray-900">
+  //               {balance.user.name}
+  //             </div>
+  //             {/* <div className="text-sm text-gray-500">
+  //               {balance.type === "owe"
+  //                 ? "You owe this person"
+  //                 : "This person owes you"}
+  //             </div> */}
+  //           </div>
+  //         </div>
+  //         <div className="text-right">
+  //           <div
+  //             className={`text-lg font-bold ${
+  //               balance.type === "owe" ? "text-red-600" : "text-green-600"
+  //             }`}
+  //           >
+  //             ₹{Math.abs(balance.amount).toLocaleString()}
+  //           </div>
+  //           {/* <div className="text-xs text-gray-500">Total balance</div> */}
+  //         </div>
+  //       </div>
+  //     </div>
+  //   </div>
+  // );
 
   interface ExpenseBreakdownProps {
     balance: Balance;
@@ -453,6 +444,12 @@ const Balances = ({ user }: BalancesProps) => {
         Close
       </button>
       <button
+        onClick={() => {
+          const upiLink =
+            "upi://pay?pa=vaibhavm3247@okicicibank&pn=vaibhav mandavkar&am=450.00&cu=INR";
+          window.location.href = upiLink;
+          console.log("Button clicked:", balance.type);
+        }}
         className={`flex-1 ${
           balance.type === "owe"
             ? "bg-red-600 hover:bg-red-700 shadow-red-600/25"
@@ -556,11 +553,11 @@ const Balances = ({ user }: BalancesProps) => {
                   {/* Left section with avatar and details */}
                   <div className="flex items-center space-x-4 flex-1 min-w-0">
                     {/* Avatar */}
-                    <div className="flex-shrink-0">
+                    {/* <div className="flex-shrink-0">
                       <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">
                         {balance.user.avatar}
                       </div>
-                    </div>
+                    </div> */}
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
@@ -647,9 +644,9 @@ const Balances = ({ user }: BalancesProps) => {
               <div className="space-y-6">
                 <AmountHero balance={selectedBalance} />
 
-                <QuickStats balance={selectedBalance} />
+                {/* <QuickStats balance={selectedBalance} /> */}
 
-                <PersonInfo balance={selectedBalance} />
+                {/* <PersonInfo balance={selectedBalance} /> */}
 
                 <ExpenseBreakdown balance={selectedBalance} />
               </div>

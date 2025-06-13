@@ -9,6 +9,7 @@ import { FiUser, FiPlus, FiLogOut } from "react-icons/fi";
 import { FaChevronDown } from "react-icons/fa";
 import Modal from "./components/ui/Modal";
 import Balances from "./components/expenses/Balances";
+import Analysis from "./components/expenses/Analysis";
 
 export default function Home() {
   const { signOut, user } = useAuth();
@@ -48,14 +49,7 @@ export default function Home() {
       case "balances":
         return <Balances user={user} />;
       case "insights":
-        return (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Insights
-            </h3>
-            <p className="text-gray-600">Coming soon...</p>
-          </div>
-        );
+        return <Analysis user={user} />;
       default:
         return <Dashboard />;
     }
@@ -85,7 +79,7 @@ export default function Home() {
             <h1 className="text-2xl font-bold text-gray-900">
               {pageInfo.title}
             </h1>
-            <p className="text-sm text-gray-600">{pageInfo.subtitle}</p>
+            {/* <p className="text-sm text-gray-600">{pageInfo.subtitle}</p> */}
           </div>
           <button
             onClick={() => setShowProfile(true)}
