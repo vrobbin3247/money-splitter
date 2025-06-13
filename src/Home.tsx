@@ -3,7 +3,8 @@ import { useNavigate, Link } from "react-router-dom";
 import ExpenseForm from "../src/components/expenses/ExpenseForm";
 import Dashboard from "../src/components/expenses/Dashboard";
 import BottomNavigation from "./components/ui/BottomNavigation";
-import { useState } from "react";
+import { supabase } from "../src/lib/supabase";
+import { useState, useEffect } from "react";
 import { FiUser, FiPlus, FiLogOut } from "react-icons/fi";
 import { FaChevronDown } from "react-icons/fa";
 import Modal from "./components/ui/Modal";
@@ -15,6 +16,7 @@ export default function Home() {
   const [showForm, setShowForm] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [activeTab, setActiveTab] = useState("expenses");
+  const [profile, setProfile] = useState<{ name: string } | null>(null); // Add profile state
 
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to logout?")) {
@@ -22,6 +24,22 @@ export default function Home() {
       navigate("/login");
     }
   };
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("name")
+          .eq("id", user.id)
+          .single();
+
+        if (data) setProfile(data);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   const renderContent = () => {
     switch (activeTab) {
@@ -112,7 +130,8 @@ export default function Home() {
               <FiUser className="w-10 h-10 text-blue-600" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">
-              {user?.email?.split("@")[0] || "User"}
+              {profile?.name || user?.email?.split("@")[0] || "User"}{" "}
+              {/* Updated to use profile name */}
             </h3>
             <p className="text-gray-600">{user?.email}</p>
           </div>
