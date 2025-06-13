@@ -238,8 +238,8 @@ export default function ExpenseForm({
               id="amount"
               name="amount"
               type="number"
-              min="0.01"
-              step="0.01"
+              min="10"
+              step="10"
               value={formData.amount || ""}
               onChange={handleInputChange}
               required

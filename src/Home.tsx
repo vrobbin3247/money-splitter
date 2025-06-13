@@ -7,6 +7,7 @@ import { useState } from "react";
 import { FiUser, FiPlus, FiLogOut } from "react-icons/fi";
 import { FaChevronDown } from "react-icons/fa";
 import Modal from "./components/ui/Modal";
+import Balances from "./components/expenses/Balances";
 
 export default function Home() {
   const { signOut, user } = useAuth();
@@ -27,14 +28,7 @@ export default function Home() {
       case "expenses":
         return <Dashboard />;
       case "balances":
-        return (
-          <div className="text-center py-12">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Balances
-            </h3>
-            <p className="text-gray-600">Coming soon...</p>
-          </div>
-        );
+        return <Balances user={user} />;
       case "insights":
         return (
           <div className="text-center py-12">
