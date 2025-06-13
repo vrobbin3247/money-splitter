@@ -445,10 +445,14 @@ const Balances = ({ user }: BalancesProps) => {
       </button>
       <button
         onClick={() => {
-          const upiLink =
-            "upi://pay?pa=vaibhavm3247@okicicibank&pn=vaibhav mandavkar&am=450.00&cu=INR";
-          window.location.href = upiLink;
-          console.log("Button clicked:", balance.type);
+          if (balance.type === "owe") {
+            const upiLink =
+              "upi://pay?pa=vaibhavm3247@okicicibank&pn=vaibhav mandavkar&am=${totalOwe}&cu=INR";
+            window.location.href = upiLink;
+            console.log("UPI Link Triggered");
+          } else {
+            console.log("Reminder functionality not implemented yet.");
+          }
         }}
         className={`flex-1 ${
           balance.type === "owe"

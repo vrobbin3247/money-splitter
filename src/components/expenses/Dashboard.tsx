@@ -18,9 +18,19 @@ interface Expense {
   [key: string]: any;
 }
 
+interface Settlement {
+  id: string;
+  expense_id: string;
+  payer_id: string;
+  payee_id: string;
+  amount: number;
+  is_settled: boolean;
+}
+
 interface Participant {
   participant_id: string;
   name: string;
+  settlement_status?: boolean;
 }
 
 interface ExpenseDetails {
@@ -44,11 +54,91 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const { user } = useAuth();
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
 
   const calculateSplitAmount = (amount: number, totalParticipants: number) => {
     return Number(amount / totalParticipants);
   };
 
+  const markAsSettled = async (participantId: string, expenseId: string) => {
+    if (!user) return;
+
+    try {
+      // Verify the expense exists and get buyer info
+      const { data: expense, error: expenseError } = await supabase
+        .from("expenses")
+        .select("buyer_id")
+        .eq("id", expenseId)
+        .single();
+
+      if (expenseError) throw expenseError;
+
+      // Check if user is participant in this expense
+      const { data: participantCheck, error: participantError } = await supabase
+        .from("expense_participants")
+        .select("participant_id")
+        .eq("expense_id", expenseId)
+        .eq("participant_id", user.id)
+        .single();
+
+      // User must be either buyer or participant
+      const isBuyer = expense.buyer_id === user.id;
+      const isParticipant = !!participantCheck;
+
+      if (!isBuyer && !isParticipant) {
+        throw new Error("You are not authorized to settle this expense");
+      }
+
+      // User can only settle themselves unless they're the buyer
+      if (!isBuyer && participantId !== user.id) {
+        throw new Error("You can only settle your own share");
+      }
+
+      // Update participant status
+      const { error: updateError } = await supabase
+        .from("expense_participants")
+        .update({ settlement_status: true })
+        .eq("expense_id", expenseId)
+        .eq("participant_id", participantId);
+
+      if (updateError) throw updateError;
+
+      // Create settlement record (payer → payee)
+      const { data: settlement, error: settlementError } = await supabase
+        .from("settlements")
+        .insert([
+          {
+            expense_id: expenseId,
+            payer_id: participantId,
+            payee_id: expense.buyer_id, // Always goes to the buyer
+            amount: calculateSplitAmount(
+              selectedExpenseDetails?.amount || 0,
+              selectedExpenseDetails?.total_participants || 1
+            ),
+            is_settled: true,
+          },
+        ])
+        .select();
+
+      if (settlementError) throw settlementError;
+
+      // Update local state
+      if (settlement && selectedExpenseDetails) {
+        setSettlements([...settlements, ...settlement]);
+        setSelectedExpenseDetails({
+          ...selectedExpenseDetails,
+          participants: selectedExpenseDetails.participants.map((p) =>
+            p.participant_id === participantId
+              ? { ...p, settlement_status: true }
+              : p
+          ),
+        });
+      }
+    } catch (error) {
+      console.error("Settlement error:", error);
+      alert(error.message);
+    }
+  };
   // Helper function to get all participants for an expense
   // const getAllParticipants = (expense: Expense) => {
   //   if (expense.participants && expense.buyer_name) {
@@ -187,6 +277,7 @@ export default function Dashboard() {
 
       setDetailsLoading(true);
       try {
+        // Fetch the basic expense data
         const { data: expenseData, error: expenseError } = await supabase
           .from("expenses")
           .select("*")
@@ -195,6 +286,7 @@ export default function Dashboard() {
 
         if (expenseError) throw expenseError;
 
+        // Fetch buyer's name
         let buyerName: string = "Unknown";
         if (expenseData?.buyer_id) {
           const { data: profileData, error: profileError } = await supabase
@@ -210,12 +302,14 @@ export default function Dashboard() {
           }
         }
 
+        // Fetch participants with their names
         const { data: participantsData, error: participantsError } =
           await supabase
             .from("expense_participants")
             .select(
               `
             participant_id,
+            settlement_status,
             profiles!inner(name)
           `
             )
@@ -223,20 +317,44 @@ export default function Dashboard() {
 
         if (participantsError) throw participantsError;
 
-        const participantsWithNames: Participant[] =
-          participantsData?.map((p: any) => ({
-            participant_id: p.participant_id,
-            name: p.profiles?.name || "Unknown",
-          })) || [];
+        // Fetch settlement records for this expense
+        const { data: settlementsData, error: settlementsError } =
+          await supabase
+            .from("settlements")
+            .select("*")
+            .eq("expense_id", selectedExpenseId);
 
-        const participantNames = participantsWithNames.map((p) => p.name);
+        if (settlementsError)
+          console.error("Error fetching settlements:", settlementsError);
+
+        setSettlements(settlementsData || []);
+
+        // Process participants with settlement status
+        const participantsWithStatus: Participant[] =
+          participantsData?.map((p: any) => {
+            const isSettled =
+              settlementsData?.some(
+                (s: Settlement) =>
+                  s.payer_id === p.participant_id && s.is_settled
+              ) || p.settlement_status;
+
+            return {
+              participant_id: p.participant_id,
+              name: p.profiles?.name || "Unknown",
+              settlement_status: isSettled,
+            };
+          }) || [];
+
+        // Calculate unique participants count
+        const participantNames = participantsWithStatus.map((p) => p.name);
         const uniqueParticipants = new Set([buyerName, ...participantNames]);
         const totalParticipants = uniqueParticipants.size;
 
+        // Update state with all the fetched data
         setSelectedExpenseDetails({
           ...expenseData,
           buyer_name: buyerName,
-          participants: participantsWithNames,
+          participants: participantsWithStatus,
           total_participants: totalParticipants,
         });
       } catch (error: any) {
@@ -248,7 +366,6 @@ export default function Dashboard() {
 
     fetchExpenseDetails();
   }, [selectedExpenseId]);
-
   // Helper function to format dates
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -413,13 +530,44 @@ export default function Dashboard() {
   }
 
   const SplitBreakdown = ({ expense }: SplitBreakdownProps) => {
-    const allParticipants = Array.from(
-      new Set([
-        expense.buyer_name,
-        ...expense.participants.map((p: any) => p.name),
-      ])
-    );
+    const { user } = useAuth();
+    const isCurrentUserBuyer = expense.buyer_id === user?.id;
 
+    // Create a map to ensure unique participants
+    const participantMap = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        isBuyer: boolean;
+        settlement_status: boolean;
+        isCurrentUser: boolean;
+      }
+    >();
+
+    // Add buyer first
+    participantMap.set(expense.buyer_id, {
+      id: expense.buyer_id,
+      name: expense.buyer_name,
+      isBuyer: true,
+      settlement_status: true, // Buyer is always considered settled
+      isCurrentUser: expense.buyer_id === user?.id,
+    });
+
+    // Add other participants
+    expense.participants.forEach((p) => {
+      if (!participantMap.has(p.participant_id)) {
+        participantMap.set(p.participant_id, {
+          id: p.participant_id,
+          name: p.name,
+          isBuyer: false,
+          settlement_status: p.settlement_status || false,
+          isCurrentUser: p.participant_id === user?.id,
+        });
+      }
+    });
+
+    const uniqueParticipants = Array.from(participantMap.values());
     const shareAmount = calculateSplitAmount(
       expense.amount,
       expense.total_participants
@@ -427,38 +575,64 @@ export default function Dashboard() {
 
     return (
       <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-            <FiUsers className="w-4 h-4 text-blue-600" />
-          </div>
-          <h4 className="font-semibold text-gray-900">Split Breakdown</h4>
-        </div>
-
+        {/* Header remains same */}
         <div className="space-y-2">
-          {allParticipants.map((name, index) => (
-            <div
-              key={index}
-              className="flex items-center justify-between py-3 px-4 bg-white rounded-xl border border-gray-100"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-gray-600">
-                    {name.charAt(0).toUpperCase()}
+          {uniqueParticipants.map((participant) => {
+            const showSettleButton =
+              (isCurrentUserBuyer && !participant.isCurrentUser) || // Buyer can settle others
+              (participant.isCurrentUser && !participant.isBuyer); // Participant can settle themselves
+
+            return (
+              <div
+                key={participant.id}
+                className="flex items-center justify-between py-3 px-4 bg-white rounded-xl border border-gray-100"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                    <span className="text-sm font-medium text-gray-600">
+                      {participant.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <span className="font-medium text-gray-900">
+                    {participant.name}
+                    {participant.isCurrentUser && (
+                      <span className="ml-2 text-xs text-gray-500">(You)</span>
+                    )}
                   </span>
+                  {participant.isBuyer ? (
+                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
+                      Paid
+                    </span>
+                  ) : participant.settlement_status ? (
+                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full font-medium">
+                      Settled
+                    </span>
+                  ) : null}
                 </div>
-                <span className="font-medium text-gray-900">{name}</span>
-                {name === expense.buyer_name && (
-                  <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                    Paid
-                  </span>
-                )}
+                <div className="text-right">
+                  <div className="font-bold text-gray-900">₹{shareAmount}</div>
+                  {!participant.settlement_status && showSettleButton && (
+                    <button
+                      onClick={async () => {
+                        // Quick client-side verification
+                        if (participant.isCurrentUser || isCurrentUserBuyer) {
+                          await markAsSettled(participant.id, expense.id);
+                        } else {
+                          alert("You can only settle your own share");
+                        }
+                      }}
+                      className={`...`}
+                    >
+                      {participant.isCurrentUser ? "I've Paid" : "Mark as Paid"}
+                    </button>
+                  )}
+                  {participant.settlement_status && !participant.isBuyer && (
+                    <div className="text-xs text-gray-500">settled</div>
+                  )}
+                </div>
               </div>
-              <div className="text-right">
-                <div className="font-bold text-gray-900">₹{shareAmount}</div>
-                <div className="text-xs text-gray-500">owes</div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     );
@@ -467,6 +641,31 @@ export default function Dashboard() {
   interface ActionButtonsProps {
     onClose: () => void;
   }
+
+  const SettlementSummary = ({ expense }: { expense: ExpenseDetails }) => {
+    const totalParticipants = expense.total_participants;
+    const settledCount = expense.participants.filter(
+      (p) => p.settlement_status
+    ).length;
+    const settlementProgress = (settledCount / (totalParticipants - 1)) * 100;
+
+    return (
+      <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-semibold text-gray-900">Settlement Progress</h4>
+          <span className="text-sm font-medium text-gray-600">
+            {settledCount}/{totalParticipants - 1} settled
+          </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div
+            className="bg-green-600 h-2.5 rounded-full"
+            style={{ width: `${settlementProgress}%` }}
+          ></div>
+        </div>
+      </div>
+    );
+  };
 
   const ActionButtons: React.FC<ActionButtonsProps> = ({ onClose }) => (
     <div className="flex gap-3 pt-2">
@@ -653,6 +852,8 @@ export default function Dashboard() {
                 <AmountHero expense={selectedExpenseDetails} />
 
                 <QuickStats expense={selectedExpenseDetails} />
+
+                <SettlementSummary expense={selectedExpenseDetails} />
 
                 <PaymentInfo expense={selectedExpenseDetails} />
 
