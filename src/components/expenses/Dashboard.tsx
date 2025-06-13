@@ -12,6 +12,9 @@ interface Expense {
   amount: number;
   buyer_id: string;
   created_at: string;
+  total_participants?: number; // Add this field
+  buyer_name?: string; // Add this field
+  participants?: Participant[]; // Add this field
   [key: string]: any;
 }
 
@@ -42,6 +45,23 @@ export default function Dashboard() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const { user } = useAuth();
 
+  const calculateSplitAmount = (amount: number, totalParticipants: number) => {
+    return Number(amount / totalParticipants);
+  };
+
+  // Helper function to get all participants for an expense
+  const getAllParticipants = (expense: Expense) => {
+    if (expense.participants && expense.buyer_name) {
+      return Array.from(
+        new Set([
+          expense.buyer_name,
+          ...expense.participants.map((p: any) => p.name),
+        ])
+      );
+    }
+    return [];
+  };
+
   useEffect(() => {
     async function fetchExpenses() {
       if (!user) {
@@ -50,6 +70,7 @@ export default function Dashboard() {
       }
 
       try {
+        // Fetch expenses where user is the buyer
         const { data: buyerExpenses, error: buyerError } = await supabase
           .from("expenses")
           .select("*")
@@ -58,6 +79,7 @@ export default function Dashboard() {
 
         if (buyerError) throw buyerError;
 
+        // Fetch expenses where user is a participant
         const { data: participantExpenses, error: participantError } =
           await supabase
             .from("expense_participants")
@@ -80,12 +102,72 @@ export default function Dashboard() {
           }, {} as Record<string, Expense>)
         );
 
-        uniqueExpenses.sort(
+        // Enhanced: Fetch participant data for each expense
+        const expensesWithParticipants = await Promise.all(
+          uniqueExpenses.map(async (expense) => {
+            try {
+              // Get buyer name
+              let buyerName = "Unknown";
+              if (expense.buyer_id) {
+                const { data: profileData } = await supabase
+                  .from("profiles")
+                  .select("name")
+                  .eq("id", expense.buyer_id)
+                  .single();
+                buyerName = profileData?.name || "Unknown";
+              }
+
+              // Get participants
+              const { data: participantsData } = await supabase
+                .from("expense_participants")
+                .select(
+                  `
+                  participant_id,
+                  profiles!inner(name)
+                `
+                )
+                .eq("expense_id", expense.id);
+
+              const participants: Participant[] =
+                participantsData?.map((p: any) => ({
+                  participant_id: p.participant_id,
+                  name: p.profiles?.name || "Unknown",
+                })) || [];
+
+              const participantNames = participants.map((p) => p.name);
+              const uniqueParticipants = new Set([
+                buyerName,
+                ...participantNames,
+              ]);
+              const totalParticipants = uniqueParticipants.size;
+
+              return {
+                ...expense,
+                buyer_name: buyerName,
+                participants,
+                total_participants: totalParticipants,
+              };
+            } catch (error) {
+              console.error(
+                `Error fetching data for expense ${expense.id}:`,
+                error
+              );
+              return {
+                ...expense,
+                buyer_name: "Unknown",
+                participants: [],
+                total_participants: 1,
+              };
+            }
+          })
+        );
+
+        expensesWithParticipants.sort(
           (a, b) =>
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         );
 
-        setExpenses(uniqueExpenses);
+        setExpenses(expensesWithParticipants);
       } catch (error: any) {
         console.error("Error fetching expenses:", error);
       } finally {
@@ -229,7 +311,15 @@ export default function Dashboard() {
           Total Amount
         </div>
         <div className="text-5xl font-bold text-green-600 mb-4">
-          ₹{expense.amount.toLocaleString()}
+          ₹
+          <span>
+            {Number.isInteger(expense.amount)
+              ? expense.amount.toLocaleString()
+              : expense.amount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+          </span>
         </div>
         <div className="inline-flex items-center gap-2 bg-white/80 rounded-full px-4 py-2 text-green-800">
           <span className="text-sm">Your share:</span>
@@ -330,9 +420,10 @@ export default function Dashboard() {
       ])
     );
 
-    const shareAmount = (expense.amount / expense.total_participants).toFixed(
-      0
-    );
+    const shareAmount = calculateSplitAmount(
+      expense.amount,
+      expense.total_participants
+    ).toFixed(0);
 
     return (
       <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
@@ -432,17 +523,11 @@ export default function Dashboard() {
 
   return (
     <div className="pb-6">
-      {/* Header */}
-      {/* <div className="mb-6">
-        <h2 className="text-2xl text-center font-bold text-gray-900 mb-2">
-          Your Expenses
-        </h2> */}
-      {/* <p className="text-gray-600">{expenses.length} total expenses</p> */}
-      {/* </div> */}
       {/* Expenses List */}
       <div className="space-y-4">
         {expenses.map((expense) => {
           const isUserBuyer = expense.buyer_id === user?.id;
+          const allParticipants = getAllParticipants(expense);
 
           return (
             <div
@@ -484,6 +569,15 @@ export default function Dashboard() {
                         )}
                       </div>
 
+                      {/* Participants count */}
+                      {expense.total_participants &&
+                        expense.total_participants > 1 && (
+                          <div className="flex items-center space-x-1 text-xs text-gray-500">
+                            <FiUsers className="w-3.5 h-3.5" />
+                            <span>{expense.total_participants} people</span>
+                          </div>
+                        )}
+
                       {/* Date */}
                       <div className="flex items-center space-x-1 text-xs text-gray-500">
                         <FiCalendar className="w-3.5 h-3.5" />
@@ -497,8 +591,43 @@ export default function Dashboard() {
                 <div className="flex-shrink-0 ml-6">
                   <div className="text-right">
                     <div className="text-xl font-bold text-gray-900 tracking-tight">
-                      ₹{expense.amount.toFixed(2)}
+                      ₹
+                      <span>
+                        {isUserBuyer
+                          ? Number.isInteger(expense.amount)
+                            ? expense.amount.toLocaleString()
+                            : expense.amount.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                          : expense.total_participants
+                          ? Number.isInteger(
+                              calculateSplitAmount(
+                                expense.amount,
+                                expense.total_participants
+                              )
+                            )
+                            ? Math.floor(
+                                calculateSplitAmount(
+                                  expense.amount,
+                                  expense.total_participants
+                                )
+                              ).toLocaleString()
+                            : calculateSplitAmount(
+                                expense.amount,
+                                expense.total_participants
+                              ).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })
+                          : "N/A"}
+                      </span>
                     </div>
+                    {!isUserBuyer && expense.total_participants && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        of ₹{expense.amount.toLocaleString()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

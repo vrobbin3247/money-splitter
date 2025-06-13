@@ -28,7 +28,7 @@ export default function Home() {
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from("profiles")
           .select("name")
           .eq("id", user.id)

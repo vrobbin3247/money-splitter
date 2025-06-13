@@ -17,7 +17,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [roommates, setRoommates] = useState<Roommate[]>([]);
-  const [inviteEmail, setInviteEmail] = useState("");
+  // const [inviteEmail, setInviteEmail] = useState("");
   const navigate = useNavigate();
 
   const fetchProfile = async () => {

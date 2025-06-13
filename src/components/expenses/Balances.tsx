@@ -386,49 +386,55 @@ const Balances = ({ user }: BalancesProps) => {
       </div>
 
       <div className="space-y-2">
-        {balance.breakdown.map((item, index) => (
-          <div
-            key={index}
-            className="flex items-center justify-between py-3 px-4 bg-white rounded-xl border border-gray-100"
-          >
-            <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900 truncate">
-                {item.expense}
-              </div>
-              <div className="flex items-center gap-3 mt-1">
-                <div className="flex items-center gap-1 text-xs text-gray-500">
-                  <FiCalendar className="w-3 h-3" />
-                  {item.date}
+        {balance.breakdown.map((item, index) => {
+          const isPaidByUser = item.paidBy === "You";
+          const amountColor = isPaidByUser ? "text-green-600" : "text-red-600";
+          const amountSign = isPaidByUser ? "-" : "+";
+
+          return (
+            <div
+              key={index}
+              className="flex items-center justify-between py-3 px-4 bg-white rounded-xl border border-gray-100"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-900 truncate">
+                  {item.expense}
                 </div>
-                {item.category && (
-                  <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium">
-                    {item.category}
+                <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <FiCalendar className="w-3 h-3" />
+                    {item.date}
                   </div>
-                )}
+                  {item.category && (
+                    <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded font-medium">
+                      {item.category}
+                    </div>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Paid by:{" "}
+                  <span
+                    className={
+                      isPaidByUser
+                        ? "text-blue-600 font-medium"
+                        : "text-gray-700"
+                    }
+                  >
+                    {item.paidBy}
+                  </span>
+                </div>
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Paid by:{" "}
-                <span
-                  className={
-                    item.paidBy === "You"
-                      ? "text-blue-600 font-medium"
-                      : "text-gray-700"
-                  }
-                >
-                  {item.paidBy}
-                </span>
+              <div className="text-right ml-4">
+                <div className={`font-bold ${amountColor}`}>
+                  {amountSign}₹{Math.abs(item.yourShare).toFixed(0)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  of ₹{item.total.toFixed(0)}
+                </div>
               </div>
             </div>
-            <div className="text-right ml-4">
-              <div className="font-bold text-gray-900">
-                ₹{item.yourShare.toFixed(0)}
-              </div>
-              <div className="text-xs text-gray-500">
-                of ₹{item.total.toFixed(0)}
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
