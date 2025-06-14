@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import { FaRupeeSign } from "react-icons/fa";
-import { FiUsers, FiX, FiUser, FiCalendar } from "react-icons/fi";
+import {
+  FiUsers,
+  FiX,
+  FiUser,
+  FiCalendar,
+  FiCheck,
+  FiClock,
+} from "react-icons/fi";
 import { categories } from "../../components/constants/categories";
 import Modal from "../ui/Modal";
 
@@ -12,9 +19,9 @@ interface Expense {
   amount: number;
   buyer_id: string;
   created_at: string;
-  total_participants?: number; // Add this field
-  buyer_name?: string; // Add this field
-  participants?: Participant[]; // Add this field
+  total_participants?: number;
+  buyer_name?: string;
+  participants?: Participant[];
   [key: string]: any;
 }
 
@@ -44,6 +51,14 @@ interface ExpenseDetails {
   created_at: string;
 }
 
+// New interface for settlement feedback
+interface SettlementFeedback {
+  show: boolean;
+  type: "success" | "error";
+  message: string;
+  participantName?: string;
+}
+
 export default function Dashboard() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
@@ -56,12 +71,27 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [settlements, setSettlements] = useState<Settlement[]>([]);
 
+  // New state for settlement feedback and loading
+  const [settlementFeedback, setSettlementFeedback] =
+    useState<SettlementFeedback>({
+      show: false,
+      type: "success",
+      message: "",
+    });
+  const [settlingParticipants, setSettlingParticipants] = useState<Set<string>>(
+    new Set()
+  );
+
   const calculateSplitAmount = (amount: number, totalParticipants: number) => {
     return Number(amount / totalParticipants);
   };
 
+  // Enhanced settlement function with better feedback
   const markAsSettled = async (participantId: string, expenseId: string) => {
-    if (!user) return;
+    if (!user || !selectedExpenseDetails) return;
+
+    // Add participant to settling state
+    setSettlingParticipants((prev) => new Set([...prev, participantId]));
 
     try {
       // Verify the expense exists and get buyer info
@@ -74,7 +104,7 @@ export default function Dashboard() {
       if (expenseError) throw expenseError;
 
       // Check if user is participant in this expense
-      const { data: participantCheck, error: participantError } = await supabase
+      const { data: participantCheck } = await supabase
         .from("expense_participants")
         .select("participant_id")
         .eq("expense_id", expenseId)
@@ -110,10 +140,10 @@ export default function Dashboard() {
           {
             expense_id: expenseId,
             payer_id: participantId,
-            payee_id: expense.buyer_id, // Always goes to the buyer
+            payee_id: expense.buyer_id,
             amount: calculateSplitAmount(
-              selectedExpenseDetails?.amount || 0,
-              selectedExpenseDetails?.total_participants || 1
+              selectedExpenseDetails.amount,
+              selectedExpenseDetails.total_participants
             ),
             is_settled: true,
           },
@@ -123,7 +153,7 @@ export default function Dashboard() {
       if (settlementError) throw settlementError;
 
       // Update local state
-      if (settlement && selectedExpenseDetails) {
+      if (settlement) {
         setSettlements([...settlements, ...settlement]);
         setSelectedExpenseDetails({
           ...selectedExpenseDetails,
@@ -133,24 +163,48 @@ export default function Dashboard() {
               : p
           ),
         });
+
+        // Show success feedback
+        const participantName =
+          selectedExpenseDetails.participants.find(
+            (p) => p.participant_id === participantId
+          )?.name || "Participant";
+
+        setSettlementFeedback({
+          show: true,
+          type: "success",
+          message: `${participantName}'s payment has been marked as settled!`,
+          participantName,
+        });
+
+        // Auto-hide feedback after 3 seconds
+        setTimeout(() => {
+          setSettlementFeedback((prev) => ({ ...prev, show: false }));
+        }, 3000);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Settlement error:", error);
-      alert(error.message);
+
+      // Show error feedback
+      setSettlementFeedback({
+        show: true,
+        type: "error",
+        message: error.message || "Failed to settle payment. Please try again.",
+      });
+
+      // Auto-hide feedback after 4 seconds
+      setTimeout(() => {
+        setSettlementFeedback((prev) => ({ ...prev, show: false }));
+      }, 4000);
+    } finally {
+      // Remove participant from settling state
+      setSettlingParticipants((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(participantId);
+        return newSet;
+      });
     }
   };
-  // Helper function to get all participants for an expense
-  // const getAllParticipants = (expense: Expense) => {
-  //   if (expense.participants && expense.buyer_name) {
-  //     return Array.from(
-  //       new Set([
-  //         expense.buyer_name,
-  //         ...expense.participants.map((p: any) => p.name),
-  //       ])
-  //     );
-  //   }
-  //   return [];
-  // };
 
   useEffect(() => {
     async function fetchExpenses() {
@@ -366,6 +420,7 @@ export default function Dashboard() {
 
     fetchExpenseDetails();
   }, [selectedExpenseId]);
+
   // Helper function to format dates
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -525,6 +580,48 @@ export default function Dashboard() {
     </div>
   );
 
+  // Enhanced Settlement Feedback Component
+  const SettlementFeedbackToast = ({
+    settlementFeedback,
+  }: {
+    settlementFeedback: {
+      show: boolean;
+      type: "success" | "error";
+      message: string;
+    };
+  }) => {
+    if (!settlementFeedback.show) return null;
+
+    return (
+      <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-in slide-in-from-top-4 duration-300">
+        <div
+          className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border ${
+            settlementFeedback.type === "success"
+              ? "bg-green-50 border-green-200 text-green-800"
+              : "bg-red-50 border-red-200 text-red-800"
+          }`}
+        >
+          <div
+            className={`w-6 h-6 rounded-full flex items-center justify-center ${
+              settlementFeedback.type === "success"
+                ? "bg-green-100"
+                : "bg-red-100"
+            }`}
+          >
+            {settlementFeedback.type === "success" ? (
+              <FiCheck className="w-4 h-4" />
+            ) : (
+              <FiX className="w-4 h-4" />
+            )}
+          </div>
+          <span className="font-medium text-sm">
+            {settlementFeedback.message}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   interface SplitBreakdownProps {
     expense: ExpenseDetails;
   }
@@ -574,60 +671,100 @@ export default function Dashboard() {
     ).toFixed(0);
 
     return (
-      <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-        {/* Header remains same */}
+      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-6 h-6 bg-purple-100 rounded flex items-center justify-center">
+            <FiUsers className="w-4 h-4 text-purple-600" />
+          </div>
+          <h4 className="font-semibold text-gray-900">Split Breakdown</h4>
+        </div>
+        <SettlementFeedbackToast settlementFeedback={settlementFeedback} />
         <div className="space-y-2">
           {uniqueParticipants.map((participant) => {
             const showSettleButton =
               (isCurrentUserBuyer && !participant.isCurrentUser) || // Buyer can settle others
               (participant.isCurrentUser && !participant.isBuyer); // Participant can settle themselves
 
+            const isSettling = settlingParticipants.has(participant.id);
+
             return (
               <div
                 key={participant.id}
-                className="flex items-center justify-between py-3 px-4 bg-white rounded-xl border border-gray-100"
+                className={`flex items-center justify-between py-3 px-3 rounded-md border transition-all duration-300 ${
+                  participant.settlement_status
+                    ? "bg-green-50 border-gray-100"
+                    : "bg-white border-gray-100"
+                }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gray-100 rounded-md flex items-center justify-center">
                     <span className="text-sm font-medium text-gray-600">
                       {participant.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
-                  <span className="font-medium text-gray-900">
-                    {participant.name}
-                    {participant.isCurrentUser && (
-                      <span className="ml-2 text-xs text-gray-500">(You)</span>
-                    )}
-                  </span>
-                  {participant.isBuyer ? (
-                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-medium">
-                      Paid
+
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium text-gray-900 truncate">
+                      {participant.name}
+                      {participant.isCurrentUser && (
+                        <span className="ml-1 text-xs text-gray-500">
+                          (You)
+                        </span>
+                      )}
                     </span>
-                  ) : participant.settlement_status ? (
-                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded-full font-medium">
-                      Settled
-                    </span>
-                  ) : null}
+                  </div>
                 </div>
-                <div className="text-right">
-                  <div className="font-bold text-gray-900">₹{shareAmount}</div>
+
+                <div className="text-right flex-shrink-0">
+                  <div className="font-bold text-gray-900 mb-1">
+                    ₹{shareAmount}
+                  </div>
+
                   {!participant.settlement_status && showSettleButton && (
                     <button
                       onClick={async () => {
-                        // Quick client-side verification
                         if (participant.isCurrentUser || isCurrentUserBuyer) {
-                          await markAsSettled(participant.id, expense.id);
+                          try {
+                            await markAsSettled(participant.id, expense.id);
+                            setSettlementFeedback({
+                              show: true,
+                              type: "success",
+                              message: "Marked as paid",
+                            });
+                          } catch (error) {
+                            setSettlementFeedback({
+                              show: true,
+                              type: "error",
+                              message: "Failed to mark as paid",
+                            });
+                          } finally {
+                            setTimeout(() => {
+                              setSettlementFeedback((prev) => ({
+                                ...prev,
+                                show: false,
+                              }));
+                            }, 3000); // auto-hide
+                          }
                         } else {
                           alert("You can only settle your own share");
                         }
                       }}
-                      className={`...`}
+                      disabled={isSettling}
+                      className={`text-xs px-2 py-1 rounded font-medium transition-all duration-200 ${
+                        isSettling
+                          ? "bg-gray-100 text-gray-500 cursor-not-allowed"
+                          : "bg-blue-600 text-white hover:bg-blue-700 active:scale-95"
+                      }`}
                     >
-                      {participant.isCurrentUser ? "I've Paid" : "Mark as Paid"}
+                      {isSettling ? (
+                        <div className="flex items-center gap-1">
+                          <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+                          <span>Settling...</span>
+                        </div>
+                      ) : (
+                        "Mark as Paid"
+                      )}
                     </button>
-                  )}
-                  {participant.settlement_status && !participant.isBuyer && (
-                    <div className="text-xs text-gray-500">settled</div>
                   )}
                 </div>
               </div>
@@ -648,21 +785,60 @@ export default function Dashboard() {
       (p) => p.settlement_status
     ).length;
     const settlementProgress = (settledCount / (totalParticipants - 1)) * 100;
+    const isFullySettled = settledCount === totalParticipants - 1;
 
     return (
-      <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
+      <div
+        className={`rounded-2xl p-5 border transition-all duration-300 ${
+          isFullySettled
+            ? "bg-green-50 border-green-200"
+            : "bg-gray-50 border-gray-200"
+        }`}
+      >
         <div className="flex items-center justify-between mb-3">
-          <h4 className="font-semibold text-gray-900">Settlement Progress</h4>
-          <span className="text-sm font-medium text-gray-600">
+          <div className="flex items-center gap-2">
+            <div
+              className={`w-6 h-6 rounded-lg flex items-center justify-center ${
+                isFullySettled ? "bg-green-100" : "bg-gray-100"
+              }`}
+            >
+              {isFullySettled ? (
+                <FiCheck className="w-4 h-4 text-green-600" />
+              ) : (
+                <FiClock className="w-4 h-4 text-gray-600" />
+              )}
+            </div>
+            <h4
+              className={`font-semibold ${
+                isFullySettled ? "text-green-900" : "text-gray-900"
+              }`}
+            >
+              Settlement Progress
+            </h4>
+          </div>
+          <span
+            className={`text-sm font-medium ${
+              isFullySettled ? "text-green-700" : "text-gray-600"
+            }`}
+          >
             {settledCount}/{totalParticipants - 1} settled
           </span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2.5">
+
+        <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
           <div
-            className="bg-green-600 h-2.5 rounded-full"
+            className={`h-3 rounded-full transition-all duration-500 ${
+              isFullySettled ? "bg-green-500" : "bg-blue-500"
+            }`}
             style={{ width: `${settlementProgress}%` }}
           ></div>
         </div>
+
+        {isFullySettled && (
+          <div className="text-sm text-green-700 font-medium mt-2">
+            🎉 All payments settled!
+          </div>
+        )}
       </div>
     );
   };
