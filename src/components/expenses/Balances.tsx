@@ -50,32 +50,36 @@ const Balances = ({ user }: BalancesProps) => {
         setLoading(true);
         setError(null);
 
-        // Get all expenses where user was buyer or participant
+        // Get all UNsettled expenses where user was buyer
         const { data: buyerExpenses, error: buyerError } = await supabase
           .from("expenses")
           .select(
             `
-            *,
-            profiles!expenses_buyer_id_fkey(name)
-          `
+      *,
+      profiles!expenses_buyer_id_fkey(name),
+      expense_participants!inner(settlement_status)
+    `
           )
           .eq("buyer_id", user.id)
+          .eq("expense_participants.settlement_status", false)
           .order("created_at", { ascending: false });
 
         if (buyerError) throw buyerError;
 
+        // Get all UNsettled expenses where user was participant
         const { data: participantExpenses, error: participantError } =
           await supabase
             .from("expense_participants")
             .select(
               `
-            expenses!inner(
-              *,
-              profiles!expenses_buyer_id_fkey(name)
-            )
-          `
+      expenses!inner(
+        *,
+        profiles!expenses_buyer_id_fkey(name)
+      )
+    `
             )
             .eq("participant_id", user.id)
+            .eq("settlement_status", false)
             .order("created_at", { ascending: false });
 
         if (participantError) throw participantError;
@@ -97,18 +101,24 @@ const Balances = ({ user }: BalancesProps) => {
         }
 
         // Get all participants for each expense
-        const expenseIds = uniqueExpenses.map((exp: any) => exp.id);
+        // const expenseIds = uniqueExpenses.map((exp: any) => exp.id);
+
+        // Get all participants (including settlement status)
         const { data: allParticipants, error: participantsError } =
           await supabase
             .from("expense_participants")
             .select(
               `
-            expense_id,
-            participant_id,
-            profiles!expense_participants_participant_id_fkey(name)
-          `
+      expense_id,
+      participant_id,
+      settlement_status,
+      profiles!expense_participants_participant_id_fkey(name)
+    `
             )
-            .in("expense_id", expenseIds);
+            .in("expense_id", [
+              ...(buyerExpenses?.map((e) => e.id) || []),
+              ...(participantExpenses?.map((p: any) => p.expenses.id) || []),
+            ]);
 
         if (participantsError) throw participantsError;
 
@@ -117,8 +127,9 @@ const Balances = ({ user }: BalancesProps) => {
 
         uniqueExpenses.forEach((expense: any) => {
           const participants =
-            allParticipants?.filter((p: any) => p.expense_id === expense.id) ||
-            [];
+            allParticipants?.filter(
+              (p: any) => p.expense_id === expense.id && !p.settlement_status // Only include unsettled participants
+            ) || [];
 
           const totalSplitters = participants.length;
           const expenseAmount = parseFloat(expense.amount.toString());
