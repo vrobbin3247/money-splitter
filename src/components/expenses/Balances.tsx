@@ -4,12 +4,12 @@ import {
   FiArrowLeft,
   FiX,
   FiDollarSign,
-  // FiLoader,
   FiCalendar,
   FiUsers,
   FiUser,
+  FiCheck,
+  FiAlertCircle,
 } from "react-icons/fi";
-// import { FaRupeeSign } from "react-icons/fa";
 import { supabase } from "../../lib/supabase";
 import Modal from "../ui/Modal";
 
@@ -19,16 +19,17 @@ interface BalancesProps {
 
 interface Balance {
   id: string;
-  user: { id: string; name: string; avatar: string };
+  user: { id: string; name: string; avatar: string; upi_id?: string };
   amount: number;
   type: "owe" | "owed";
   breakdown: {
+    expenseId: string;
     expense: string;
     date: string;
     total: number;
     yourShare: number;
     paidBy: string;
-    upi_id: string;
+    upi_id?: string;
     category: string;
   }[];
 }
@@ -38,6 +39,7 @@ const Balances = ({ user }: BalancesProps) => {
   const [balances, setBalances] = useState<Balance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [settling, setSettling] = useState(false);
 
   useEffect(() => {
     async function calculateBalances() {
@@ -56,8 +58,8 @@ const Balances = ({ user }: BalancesProps) => {
           .select(
             `
       *,
-      profiles!expenses_buyer_id_fkey(name),
-      expense_participants!inner(settlement_status)
+      profiles!expenses_buyer_id_fkey(name, upi_id),
+      expense_participants!inner(settlement_status, participant_id)
     `
           )
           .eq("buyer_id", user.id)
@@ -74,7 +76,7 @@ const Balances = ({ user }: BalancesProps) => {
               `
       expenses!inner(
         *,
-        profiles!expenses_buyer_id_fkey(name)
+        profiles!expenses_buyer_id_fkey(name, upi_id)
       )
     `
             )
@@ -101,9 +103,6 @@ const Balances = ({ user }: BalancesProps) => {
         }
 
         // Get all participants for each expense
-        // const expenseIds = uniqueExpenses.map((exp: any) => exp.id);
-
-        // Get all participants (including settlement status)
         const { data: allParticipants, error: participantsError } =
           await supabase
             .from("expense_participants")
@@ -112,7 +111,7 @@ const Balances = ({ user }: BalancesProps) => {
       expense_id,
       participant_id,
       settlement_status,
-      profiles!expense_participants_participant_id_fkey(name)
+      profiles!expense_participants_participant_id_fkey(name, upi_id)
     `
             )
             .in("expense_id", [
@@ -127,10 +126,8 @@ const Balances = ({ user }: BalancesProps) => {
 
         uniqueExpenses.forEach((expense: any) => {
           const participants =
-            allParticipants?.filter(
-              (p: any) => p.expense_id === expense.id && !p.settlement_status // Only include unsettled participants
-            ) || [];
-
+            allParticipants?.filter((p: any) => p.expense_id === expense.id) ||
+            [];
           const totalSplitters = participants.length;
           const expenseAmount = parseFloat(expense.amount.toString());
           const shareAmount = expenseAmount / totalSplitters;
@@ -138,8 +135,12 @@ const Balances = ({ user }: BalancesProps) => {
           if (totalSplitters === 0) return;
 
           if (expense.buyer_id === user.id) {
+            // User paid for this expense
             participants.forEach((participant: any) => {
-              if (participant.participant_id !== user.id) {
+              if (
+                participant.participant_id !== user.id &&
+                !participant.settlement_status
+              ) {
                 const participantId = participant.participant_id;
 
                 if (!userBalances[participantId]) {
@@ -147,6 +148,7 @@ const Balances = ({ user }: BalancesProps) => {
                     user: {
                       id: participantId,
                       name: participant.profiles.name,
+                      upi_id: participant.profiles.upi_id,
                     },
                     amount: 0,
                     breakdown: [],
@@ -156,36 +158,50 @@ const Balances = ({ user }: BalancesProps) => {
                 userBalances[participantId].amount -= shareAmount;
 
                 userBalances[participantId].breakdown.push({
+                  expenseId: expense.id,
                   expense: expense.title,
                   date: new Date(expense.created_at).toLocaleDateString(),
                   total: expenseAmount,
                   yourShare: shareAmount,
                   paidBy: "You",
+                  upi_id: participant.profiles.upi_id,
                   category: expense.category,
                 });
               }
             });
           } else {
-            const buyerId = expense.buyer_id;
+            // Someone else paid for this expense
+            const userParticipant = participants.find(
+              (p) => p.participant_id === user.id
+            );
+            if (userParticipant && !userParticipant.settlement_status) {
+              const buyerId = expense.buyer_id;
 
-            if (!userBalances[buyerId]) {
-              userBalances[buyerId] = {
-                user: { id: buyerId, name: expense.profiles.name },
-                amount: 0,
-                breakdown: [],
-              };
+              if (!userBalances[buyerId]) {
+                userBalances[buyerId] = {
+                  user: {
+                    id: buyerId,
+                    name: expense.profiles.name,
+                    upi_id: expense.profiles.upi_id,
+                  },
+                  amount: 0,
+                  breakdown: [],
+                };
+              }
+
+              userBalances[buyerId].amount += shareAmount;
+
+              userBalances[buyerId].breakdown.push({
+                expenseId: expense.id,
+                expense: expense.title,
+                date: new Date(expense.created_at).toLocaleDateString(),
+                total: expenseAmount,
+                yourShare: shareAmount,
+                paidBy: expense.profiles.name,
+                upi_id: expense.profiles.upi_id,
+                category: expense.category,
+              });
             }
-
-            userBalances[buyerId].amount += shareAmount;
-
-            userBalances[buyerId].breakdown.push({
-              expense: expense.title,
-              date: new Date(expense.created_at).toLocaleDateString(),
-              total: expenseAmount,
-              yourShare: shareAmount,
-              paidBy: expense.profiles.name,
-              category: expense.category,
-            });
           }
         });
 
@@ -198,6 +214,7 @@ const Balances = ({ user }: BalancesProps) => {
               id: balance.user.id,
               name: balance.user.name,
               avatar: balance.user.name.charAt(0).toUpperCase(),
+              upi_id: balance.user.upi_id,
             },
             amount: balance.amount,
             type: balance.amount > 0 ? ("owe" as "owe") : ("owed" as "owed"),
@@ -206,6 +223,7 @@ const Balances = ({ user }: BalancesProps) => {
 
         setBalances(balanceArray);
       } catch (error) {
+        console.error("Error calculating balances:", error);
         setError("Failed to load balances. Please try again.");
       } finally {
         setLoading(false);
@@ -214,6 +232,147 @@ const Balances = ({ user }: BalancesProps) => {
 
     calculateBalances();
   }, [user]);
+
+  const handleCompleteSettlement = async (balance: Balance) => {
+    if (!balance.user.upi_id) {
+      alert(
+        "UPI ID not available for this user. Please ask them to update their profile."
+      );
+      return;
+    }
+
+    try {
+      setSettling(true);
+
+      // 1. Get all expense IDs involved in this balance
+      const expenseIds = balance.breakdown.map((item) => item.expenseId);
+
+      // 2. Create UPI payment link
+      const upiLink = `upi://pay?pa=${
+        balance.user.upi_id
+      }&pn=${encodeURIComponent(balance.user.name)}&am=${Math.abs(
+        balance.amount
+      ).toFixed(2)}&cu=INR&tn=${encodeURIComponent(
+        `Settlement for ${balance.breakdown.length} expenses`
+      )}`;
+
+      // Open UPI app
+      window.open(upiLink, "_blank");
+
+      // 3. Wait for user confirmation with better UX
+      const paymentConfirmed = await new Promise<boolean>((resolve) => {
+        const confirmDialog = confirm(
+          `Did you complete the UPI payment of ₹${Math.abs(
+            balance.amount
+          ).toFixed(2)} to ${
+            balance.user.name
+          }?\n\nClick OK if payment was successful, Cancel if not.`
+        );
+        resolve(confirmDialog);
+      });
+
+      if (!paymentConfirmed) {
+        setSettling(false);
+        return;
+      }
+
+      // 4. Create settlement record
+      const { error: settlementError } = await supabase
+        .from("settlements")
+        .insert({
+          payer_id: user.id,
+          payee_id: balance.user.id,
+          amount: Math.abs(balance.amount),
+          settlement_date: new Date().toISOString(),
+          is_settled: true,
+          expense_details: balance.breakdown.map((b) => ({
+            expense_id: b.expenseId,
+            expense_title: b.expense,
+            amount: b.yourShare,
+          })),
+        });
+
+      if (settlementError) {
+        console.error("Settlement record error:", settlementError);
+        throw new Error("Failed to create settlement record");
+      }
+
+      // 5. Mark all related expense participants as settled
+      const { error: updateError } = await supabase
+        .from("expense_participants")
+        .update({
+          settlement_status: true,
+          settled_at: new Date().toISOString(),
+        })
+        .in("expense_id", expenseIds)
+        .eq("participant_id", user.id);
+
+      if (updateError) {
+        console.error("Update participants error:", updateError);
+        throw new Error("Failed to update settlement status");
+      }
+
+      // 6. Update UI state
+      setBalances((prev) => prev.filter((b) => b.id !== balance.id));
+      setSelectedBalance(null);
+
+      // Show success feedback with better messaging
+      const successMessage =
+        `✅ Settlement Successful!\n\n` +
+        `Amount: ₹${Math.abs(balance.amount).toFixed(2)}\n` +
+        `To: ${balance.user.name}\n` +
+        `Expenses settled: ${balance.breakdown.length}\n\n` +
+        `All related expenses have been marked as settled.`;
+
+      alert(successMessage);
+    } catch (error) {
+      console.error("Settlement failed:", error);
+      alert(
+        `❌ Settlement Failed\n\n${
+          error instanceof Error ? error.message : "Unknown error occurred"
+        }\n\nPlease try again or contact support if the issue persists.`
+      );
+    } finally {
+      setSettling(false);
+    }
+  };
+
+  const handleSendReminder = async (balance: Balance) => {
+    try {
+      // Create a reminder message
+      const reminderText =
+        `Hi ${balance.user.name}! 👋\n\n` +
+        `You have an outstanding balance of ₹${Math.abs(balance.amount).toFixed(
+          2
+        )} ` +
+        `from ${balance.breakdown.length} shared expense${
+          balance.breakdown.length > 1 ? "s" : ""
+        }.\n\n` +
+        `Please settle up when convenient. Thanks! 😊`;
+
+      // For now, copy to clipboard (you can integrate with WhatsApp API later)
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(reminderText);
+        alert(
+          `📋 Reminder message copied to clipboard!\n\nYou can now paste and send it to ${balance.user.name}.`
+        );
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement("textarea");
+        textArea.value = reminderText;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textArea);
+        alert(
+          `📋 Reminder message copied to clipboard!\n\nYou can now paste and send it to ${balance.user.name}.`
+        );
+      }
+    } catch (error) {
+      console.error("Failed to copy reminder:", error);
+      alert("Failed to create reminder. Please try again.");
+    }
+  };
 
   // Modal Components matching Dashboard style
   interface ModalHeaderProps {
@@ -283,96 +442,19 @@ const Balances = ({ user }: BalancesProps) => {
             {balance.breakdown.length > 1 ? "s" : ""}
           </span>
         </div>
+
+        {/* UPI ID Display */}
+        {balance.user.upi_id && (
+          <div className="mt-4 p-3 bg-white/60 rounded-2xl">
+            <div className="text-xs text-gray-600 mb-1">UPI ID</div>
+            <div className="text-sm font-mono text-gray-800">
+              {balance.user.upi_id}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
-
-  // interface QuickStatsProps {
-  //   balance: Balance;
-  // }
-
-  // const QuickStats = ({ balance }: QuickStatsProps) => (
-  //   <div className="grid grid-cols-2 gap-3">
-  //     <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-  //       <div className="flex items-center gap-3">
-  //         <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-  //           <FiUsers className="w-5 h-5 text-blue-600" />
-  //         </div>
-  //         <div>
-  //           <div className="text-2xl font-bold text-blue-600">
-  //             {balance.breakdown.length}
-  //           </div>
-  //           <div className="text-xs text-blue-700 font-medium">
-  //             Shared expenses
-  //           </div>
-  //         </div>
-  //       </div>
-  //     </div>
-
-  //     <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100">
-  //       <div className="flex items-center gap-3">
-  //         <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-  //           <FaRupeeSign className="w-5 h-5 text-purple-600" />
-  //         </div>
-  //         <div>
-  //           <div className="text-2xl font-bold text-purple-600">
-  //             {(Math.abs(balance.amount) / balance.breakdown.length).toFixed(0)}
-  //           </div>
-  //           <div className="text-xs text-purple-700 font-medium">
-  //             Avg per expense
-  //           </div>
-  //         </div>
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
-
-  // interface PersonInfoProps {
-  //   balance: Balance;
-  // }
-
-  // const PersonInfo = ({ balance }: PersonInfoProps) => (
-  //   <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
-  //     <div className="flex items-center gap-2 mb-4">
-  //       <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center">
-  //         <FiUser className="w-4 h-4 text-blue-600" />
-  //       </div>
-  //       <h4 className="font-semibold text-gray-900">Person Details</h4>
-  //     </div>
-
-  //     <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-  //       <div className="flex items-center justify-between">
-  //         <div className="flex items-center gap-3">
-  //           <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center border-2 border-blue-200">
-  //             <span className="text-lg font-bold text-blue-700">
-  //               {balance.user.avatar}
-  //             </span>
-  //           </div>
-  //           <div>
-  //             <div className="font-semibold text-gray-900">
-  //               {balance.user.name}
-  //             </div>
-  //             {/* <div className="text-sm text-gray-500">
-  //               {balance.type === "owe"
-  //                 ? "You owe this person"
-  //                 : "This person owes you"}
-  //             </div> */}
-  //           </div>
-  //         </div>
-  //         <div className="text-right">
-  //           <div
-  //             className={`text-lg font-bold ${
-  //               balance.type === "owe" ? "text-red-600" : "text-green-600"
-  //             }`}
-  //           >
-  //             ₹{Math.abs(balance.amount).toLocaleString()}
-  //           </div>
-  //           {/* <div className="text-xs text-gray-500">Total balance</div> */}
-  //         </div>
-  //       </div>
-  //     </div>
-  //   </div>
-  // );
 
   interface ExpenseBreakdownProps {
     balance: Balance;
@@ -450,28 +532,46 @@ const Balances = ({ user }: BalancesProps) => {
     <div className="flex gap-3 pt-2">
       <button
         onClick={onClose}
-        className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-semibold hover:bg-gray-200 transition-all duration-200 active:scale-98"
+        disabled={settling}
+        className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-2xl font-semibold hover:bg-gray-200 transition-all duration-200 active:scale-98 disabled:opacity-50"
       >
         Close
       </button>
       <button
         onClick={() => {
           if (balance.type === "owe") {
-            const upiLink =
-              "upi://pay?pa=vaibhavm3247@okicicibank&pn=vaibhav mandavkar&am=${totalOwe}&cu=INR";
-            window.location.href = upiLink;
-            console.log("UPI Link Triggered");
+            handleCompleteSettlement(balance);
           } else {
-            console.log("Reminder functionality not implemented yet.");
+            handleSendReminder(balance);
           }
         }}
+        disabled={settling}
         className={`flex-1 ${
           balance.type === "owe"
             ? "bg-red-600 hover:bg-red-700 shadow-red-600/25"
             : "bg-green-600 hover:bg-green-700 shadow-green-600/25"
-        } text-white py-4 rounded-2xl font-semibold transition-all duration-200 active:scale-98 shadow-lg`}
+        } text-white py-4 rounded-2xl font-semibold transition-all duration-200 active:scale-98 shadow-lg disabled:opacity-50 flex items-center justify-center gap-2`}
       >
-        {balance.type === "owe" ? "Settle Up" : "Remind"}
+        {settling ? (
+          <>
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            Processing...
+          </>
+        ) : (
+          <>
+            {balance.type === "owe" ? (
+              <>
+                <FiCheck className="w-4 h-4" />
+                Settle Up
+              </>
+            ) : (
+              <>
+                <FiAlertCircle className="w-4 h-4" />
+                Send Reminder
+              </>
+            )}
+          </>
+        )}
       </button>
     </div>
   );
@@ -501,7 +601,10 @@ const Balances = ({ user }: BalancesProps) => {
   if (error) {
     return (
       <div className="text-center py-20">
-        <div className="text-red-500 mb-4">{error}</div>
+        <div className="text-red-500 mb-4 flex items-center justify-center gap-2">
+          <FiAlertCircle className="w-5 h-5" />
+          {error}
+        </div>
         <button
           onClick={() => window.location.reload()}
           className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-semibold hover:bg-blue-700 transition-colors"
@@ -567,13 +670,6 @@ const Balances = ({ user }: BalancesProps) => {
                 <div className="flex items-center justify-between">
                   {/* Left section with avatar and details */}
                   <div className="flex items-center space-x-4 flex-1 min-w-0">
-                    {/* Avatar */}
-                    {/* <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">
-                        {balance.user.avatar}
-                      </div>
-                    </div> */}
-
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
@@ -658,10 +754,6 @@ const Balances = ({ user }: BalancesProps) => {
             <div className="flex-1 overflow-y-auto px-6 py-6">
               <div className="space-y-6">
                 <AmountHero balance={selectedBalance} />
-
-                {/* <QuickStats balance={selectedBalance} /> */}
-
-                {/* <PersonInfo balance={selectedBalance} /> */}
 
                 <ExpenseBreakdown balance={selectedBalance} />
               </div>
