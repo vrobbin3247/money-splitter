@@ -6,10 +6,11 @@ import BottomNavigation from "./components/ui/BottomNavigation";
 import { supabase } from "../src/lib/supabase";
 import { useState, useEffect } from "react";
 import { FiUser, FiPlus, FiLogOut } from "react-icons/fi";
-import { FaChevronDown, FaBell } from "react-icons/fa";
+import { FaChevronDown } from "react-icons/fa";
 import Modal from "./components/ui/Modal";
 import Balances from "./components/expenses/Balances";
 import Analysis from "./components/expenses/Analysis";
+import NotificationDropdown from "./components/notifications/NotificationDropdown";
 
 export default function Home() {
   const { signOut, user } = useAuth();
@@ -93,14 +94,7 @@ export default function Home() {
 
           {/* Notifications - Right */}
           <div className="relative">
-            <button
-              aria-label="Notifications"
-              className="p-2 rounded-full transition-colors hover:bg-gray-100 active:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 relative"
-            >
-              <FaBell className="w-5 h-5 text-gray-700" />
-              {/* Notification badge */}
-              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationDropdown userId={user.id} />
           </div>
         </div>
       </div>
@@ -184,7 +178,7 @@ export default function Home() {
           asPopup={false}
           onSuccess={() => {
             setShowForm(false);
-            window.location.reload(); // optional
+            // window.location.reload(); // optional
           }}
           onCancel={() => setShowForm(false)}
         />

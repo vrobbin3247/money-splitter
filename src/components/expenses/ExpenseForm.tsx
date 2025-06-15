@@ -24,6 +24,42 @@ interface ExpenseFormProps {
   onCancel?: () => void;
 }
 
+const sendExpenseNotification = async (
+  expenseId: string,
+  buyerId: string,
+  participants: string[],
+  title: string,
+  amount: number,
+  buyerName: string
+) => {
+  try {
+    const notifications = participants
+      .filter((id) => id !== buyerId)
+      .map((participantId) => ({
+        type: "expense_created" as const,
+        recipient_id: participantId,
+        sender_id: buyerId,
+        expense_id: expenseId,
+        amount: amount / participants.length,
+        metadata: {
+          expense_title: title,
+          participants_count: participants.length,
+          sender_name: buyerName, // Include sender's name
+        },
+      }));
+
+    if (notifications.length > 0) {
+      const { error } = await supabase
+        .from("notifications")
+        .insert(notifications);
+
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error("Failed to send notifications:", error);
+  }
+};
+
 export default function ExpenseForm({
   asPopup = false,
   onSuccess,
@@ -131,6 +167,7 @@ export default function ExpenseForm({
         throw new Error("Please fill all required fields");
       }
 
+      // Create expense
       const { data: expense, error: expenseError } = await supabase
         .from("expenses")
         .insert({
@@ -144,6 +181,7 @@ export default function ExpenseForm({
 
       if (expenseError) throw expenseError;
 
+      // Add participants
       const participantsData = formData.participants.map((id) => ({
         expense_id: expense.id,
         participant_id: id,
@@ -154,6 +192,17 @@ export default function ExpenseForm({
         .insert(participantsData);
 
       if (participantsError) throw participantsError;
+
+      // Send notifications to all participants except buyer
+      if (user?.id) {
+        await sendExpenseNotification(
+          expense.id,
+          user.id,
+          formData.participants,
+          formData.title,
+          formData.amount
+        );
+      }
 
       setSuccess(true);
       setFormData({
