@@ -6,7 +6,7 @@ import BottomNavigation from "./components/ui/BottomNavigation";
 import { supabase } from "../src/lib/supabase";
 import { useState, useEffect } from "react";
 import { FiUser, FiPlus, FiLogOut } from "react-icons/fi";
-import { FaChevronDown } from "react-icons/fa";
+import { FaChevronDown, FaBell } from "react-icons/fa";
 import Modal from "./components/ui/Modal";
 import Balances from "./components/expenses/Balances";
 import Analysis from "./components/expenses/Analysis";
@@ -72,21 +72,36 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Fixed Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-200 z-40">
-        <div className="px-4 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              {pageInfo.title}
-            </h1>
-            {/* <p className="text-sm text-gray-600">{pageInfo.subtitle}</p> */}
-          </div>
+      {/* Enhanced Fixed Header */}
+      <div className="sticky top-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 z-40 shadow-sm">
+        <div className="px-4 sm:px-6 py-3 flex justify-between items-center max-w-7xl mx-auto">
+          {/* Profile Button - Left */}
           <button
             onClick={() => setShowProfile(true)}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="User profile"
+            className="p-2 rounded-full transition-colors hover:bg-gray-100 active:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
-            <FiUser className="w-6 h-6 text-blue-600" />
+            <FiUser className="w-5 h-5 text-gray-700" />
           </button>
+
+          {/* App Title - Center */}
+          <div className="flex items-center">
+            <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-blue-400 bg-clip-text text-transparent">
+              MoneySplitter
+            </h1>
+          </div>
+
+          {/* Notifications - Right */}
+          <div className="relative">
+            <button
+              aria-label="Notifications"
+              className="p-2 rounded-full transition-colors hover:bg-gray-100 active:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 relative"
+            >
+              <FaBell className="w-5 h-5 text-gray-700" />
+              {/* Notification badge */}
+              <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+          </div>
         </div>
       </div>
 
