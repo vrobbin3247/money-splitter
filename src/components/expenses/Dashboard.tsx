@@ -915,7 +915,7 @@ export default function Dashboard() {
   }
 
   // Enhanced settlement function with user perspective
-  const getSettlementStatus = (expense, userId) => {
+  const getSettlementStatus = (expense: Expense, userId?: string) => {
     if (!expense.total_participants || expense.total_participants <= 1) {
       return {
         isFullySettled: true,
@@ -929,7 +929,8 @@ export default function Dashboard() {
     const isUserBuyer = expense.buyer_id === userId;
     const totalCount = expense.total_participants - 1; // Exclude buyer
     const settledCount = expense.participants
-      ? expense.participants.filter((p) => p.settlement_status).length
+      ? expense.participants.filter((p: Participant) => p.settlement_status)
+          .length
       : 0;
 
     if (isUserBuyer) {
@@ -947,7 +948,7 @@ export default function Dashboard() {
     } else {
       // Participant perspective: Only care about their own settlement
       const userParticipant = expense.participants?.find(
-        (p) => p.participant_id === userId
+        (p: Participant) => p.participant_id === userId
       );
       const isUserSettled = userParticipant?.settlement_status || false;
       return {
@@ -1032,7 +1033,7 @@ export default function Dashboard() {
                         <span>{formatDate(expense.created_at)}</span>
                       </div>
 
-                      {expense.total_participants > 1 && (
+                      {(expense.total_participants ?? 0) > 1 && (
                         <div className="flex items-center gap-1">
                           <FiUsers className="w-3 h-3 opacity-70" />
                           <span>{expense.total_participants}</span>
@@ -1068,7 +1069,7 @@ export default function Dashboard() {
                       : splitAmount.toLocaleString()}
                   </div>
 
-                  {!isUserBuyer && expense.total_participants > 1 && (
+                  {!isUserBuyer && (expense.total_participants ?? 0) > 1 && (
                     <div className="text-xs text-gray-400 mt-0.5">
                       of ₹{expense.amount.toLocaleString()}
                     </div>
