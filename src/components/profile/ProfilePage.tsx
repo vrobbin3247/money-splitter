@@ -74,12 +74,20 @@ export default function ProfilePage() {
     if (!user) return;
     setLoading(true);
     setError("");
+
+    // Basic UPI ID validation
+    if (upiId && !upiId.match(/^[a-zA-Z0-9._-]+@[a-zA-Z0-9]+$/)) {
+      setError("Please enter a valid UPI ID (e.g. name@upi)");
+      setLoading(false);
+      return;
+    }
+
     try {
       const { error } = await supabase.from("profiles").upsert(
         {
           id: user.id,
           name,
-          upi_id: upiId, // Added UPI ID to update
+          upi_id: upiId,
         },
         { onConflict: "id" }
       );

@@ -85,7 +85,7 @@ export default function Home() {
             onClick={() => setShowProfile(true)}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
-            <FiUser className="w-6 h-6 text-gray-700" />
+            <FiUser className="w-6 h-6 text-blue-600" />
           </button>
         </div>
       </div>

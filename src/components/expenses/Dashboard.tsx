@@ -893,10 +893,15 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading expenses...</p>
+      <div className="h-screen p-6 animate-pulse">
+        <div className="flex justify-between mb-8">
+          <div className="h-8 bg-gray-200 rounded w-32"></div>
+          <div className="h-8 bg-gray-200 rounded w-8"></div>
+        </div>
+        <div className="space-y-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-20 bg-gray-100 rounded-xl"></div>
+          ))}
         </div>
       </div>
     );
