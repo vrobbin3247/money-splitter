@@ -55,20 +55,20 @@ export default function Home() {
     }
   };
 
-  const getPageTitle = () => {
-    switch (activeTab) {
-      case "expenses":
-        return { title: "Expenses", subtitle: "Split & track with roommates" };
-      case "balances":
-        return { title: "Balances", subtitle: "Who owes what" };
-      case "insights":
-        return { title: "Insights", subtitle: "Analytics & trends" };
-      default:
-        return { title: "Expenses", subtitle: "Split & track with roommates" };
-    }
-  };
+  // const getPageTitle = () => {
+  //   switch (activeTab) {
+  //     case "expenses":
+  //       return { title: "Expenses", subtitle: "Split & track with roommates" };
+  //     case "balances":
+  //       return { title: "Balances", subtitle: "Who owes what" };
+  //     case "insights":
+  //       return { title: "Insights", subtitle: "Analytics & trends" };
+  //     default:
+  //       return { title: "Expenses", subtitle: "Split & track with roommates" };
+  //   }
+  // };
 
-  const pageInfo = getPageTitle();
+  // const pageInfo = getPageTitle();
 
   return (
     <div className="min-h-screen bg-gray-50">
