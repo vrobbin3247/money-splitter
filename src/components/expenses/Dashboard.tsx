@@ -35,9 +35,10 @@ interface Settlement {
 }
 
 interface Participant {
-  participant_id: string;
+  id?: string; // expense_participants table id
+  participant_id: string; // references profiles.id
   name: string;
-  settlement_status?: boolean;
+  settlement_status?: boolean; // defaults to false in DB
 }
 
 interface ExpenseDetails {
@@ -261,22 +262,39 @@ export default function Dashboard() {
                 buyerName = profileData?.name || "Unknown";
               }
 
-              // Get participants
+              // Get participants WITH settlement_status - THIS IS THE FIX
               const { data: participantsData } = await supabase
                 .from("expense_participants")
                 .select(
                   `
                   participant_id,
+                  settlement_status,
                   profiles!inner(name)
                 `
                 )
                 .eq("expense_id", expense.id);
 
+              // Also fetch settlements to double-check status (same logic as details)
+              const { data: settlementsData } = await supabase
+                .from("settlements")
+                .select("*")
+                .eq("expense_id", expense.id);
+
               const participants: Participant[] =
-                participantsData?.map((p: any) => ({
-                  participant_id: p.participant_id,
-                  name: p.profiles?.name || "Unknown",
-                })) || [];
+                participantsData?.map((p: any) => {
+                  // Same settlement logic as in fetchExpenseDetails
+                  const isSettled =
+                    settlementsData?.some(
+                      (s: any) =>
+                        s.payer_id === p.participant_id && s.is_settled
+                    ) || p.settlement_status;
+
+                  return {
+                    participant_id: p.participant_id,
+                    name: p.profiles?.name || "Unknown",
+                    settlement_status: isSettled, // ✅ Now included!
+                  };
+                }) || [];
 
               const participantNames = participants.map((p) => p.name);
               const uniqueParticipants = new Set([
@@ -671,7 +689,7 @@ export default function Dashboard() {
     ).toFixed(0);
 
     return (
-      <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+      <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-6 h-6 bg-purple-100 rounded flex items-center justify-center">
             <FiUsers className="w-4 h-4 text-purple-600" />
@@ -690,7 +708,7 @@ export default function Dashboard() {
             return (
               <div
                 key={participant.id}
-                className={`flex items-center justify-between py-3 px-3 rounded-md border transition-all duration-300 ${
+                className={`flex items-center justify-between py-3 px-3 rounded-2xl border transition-all duration-300 ${
                   participant.settlement_status
                     ? "bg-green-50 border-gray-100"
                     : "bg-white border-gray-100"
@@ -896,117 +914,177 @@ export default function Dashboard() {
     );
   }
 
+  // Enhanced settlement function with user perspective
+  const getSettlementStatus = (expense, userId) => {
+    if (!expense.total_participants || expense.total_participants <= 1) {
+      return {
+        isFullySettled: true,
+        settledCount: 0,
+        totalCount: 0,
+        progress: 100,
+        userPerspective: "complete",
+      };
+    }
+
+    const isUserBuyer = expense.buyer_id === userId;
+    const totalCount = expense.total_participants - 1; // Exclude buyer
+    const settledCount = expense.participants
+      ? expense.participants.filter((p) => p.settlement_status).length
+      : 0;
+
+    if (isUserBuyer) {
+      // Buyer perspective: Show overall settlement progress
+      const isFullySettled = settledCount === totalCount;
+      const progress = (settledCount / totalCount) * 100;
+      return {
+        isFullySettled,
+        settledCount,
+        totalCount,
+        progress,
+        userPerspective: "buyer",
+        displayText: `${settledCount}/${totalCount} paid`,
+      };
+    } else {
+      // Participant perspective: Only care about their own settlement
+      const userParticipant = expense.participants?.find(
+        (p) => p.participant_id === userId
+      );
+      const isUserSettled = userParticipant?.settlement_status || false;
+      return {
+        isFullySettled: isUserSettled,
+        settledCount: isUserSettled ? 1 : 0,
+        totalCount: 1,
+        progress: isUserSettled ? 100 : 0,
+        userPerspective: "participant",
+        displayText: isUserSettled ? "Paid" : "Pending",
+      };
+    }
+  };
+
   return (
     <div className="pb-6">
       {/* Expenses List */}
-      <div className="space-y-4">
+      <div className="space-y-3">
+        {" "}
+        {/* Reduced spacing */}
         {expenses.map((expense) => {
           const isUserBuyer = expense.buyer_id === user?.id;
+          const settlement = getSettlementStatus(expense, user?.id);
+          const splitAmount = expense.total_participants
+            ? calculateSplitAmount(expense.amount, expense.total_participants)
+            : 0;
 
           return (
             <div
               key={expense.id}
-              className={`bg-white rounded-2xl py-2.5 px-4 shadow-sm border border-gray-100 active:scale-[0.98] transition-all cursor-pointer ${
-                selectedExpenseId === expense.id
-                  ? "ring-2 ring-blue-500 border-blue-200"
-                  : "hover:shadow-md"
-              }`}
+              className={`relative shadow-sm bg-white rounded-2xl py-2.5 p-4 border  active:scale-[0.98] transition-all cursor-pointer group
+                ${
+                  settlement.isFullySettled
+                    ? "border-l border-t border-r-4 border-r-green-400 border-b border-gray-100"
+                    : "border border-gray-100 hover:border-gray-300"
+                }
+          ${
+            selectedExpenseId === expense.id
+              ? "ring-1 ring-blue-400 border-blue-200"
+              : "border-gray-100 hover:border-gray-300"
+          }
+          ${settlement.isFullySettled ? "opacity-90" : ""}`}
               onClick={() => setSelectedExpenseId(expense.id)}
             >
-              <div className="flex items-center justify-between">
-                {/* Left section with icon and details */}
-                <div className="flex items-center space-x-4 flex-1 min-w-0">
-                  {/* Category Icon with background */}
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 flex items-center text-2xl justify-center">
-                      {getCategoryIcon(expense.category)}
-                    </div>
+              {/* Main content */}
+              <div className="flex items-start justify-between">
+                {/* Left content */}
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  {/* Category icon - more subtle */}
+                  <div
+                    className={`p-2 rounded-lg mt-1 ${
+                      settlement.isFullySettled
+                        ? "bg-green-50  text-green-600"
+                        : "bg-gray-50 text-gray-600"
+                    }`}
+                  >
+                    {getCategoryIcon(expense.category)}
                   </div>
 
-                  {/* Content */}
+                  {/* Text content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex gap-2">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2 truncate">
+                    <div className="flex items-baseline gap-2">
+                      <h3 className="text-base font-medium text-gray-900 truncate">
                         {expense.title}
                       </h3>
-                      <div className="flex-shrink-0">
-                        {isUserBuyer ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            paid
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                            Split
-                          </span>
-                        )}
-                      </div>
+
+                      {/* Tiny status dot */}
+                      <div
+                        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          settlement.isFullySettled
+                            ? "bg-green-500"
+                            : isUserBuyer
+                            ? "bg-blue-500"
+                            : "bg-amber-400"
+                        }`}
+                      />
                     </div>
 
-                    <div className="flex items-center space-x-2">
-                      {/* Payment status badge */}
-
-                      {/* Participants count */}
-                      {expense.total_participants &&
-                        expense.total_participants > 1 && (
-                          <div className="flex items-center space-x-1 text-xs text-gray-500">
-                            <FiUsers className="w-3.5 h-3.5" />
-                            <span>{expense.total_participants} people</span>
-                          </div>
-                        )}
-
-                      {/* Date */}
-                      <div className="flex items-center space-x-1 text-xs text-gray-500">
-                        <FiCalendar className="w-3.5 h-3.5" />
+                    {/* Metadata row */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <FiCalendar className="w-3 h-3 opacity-70" />
                         <span>{formatDate(expense.created_at)}</span>
                       </div>
+
+                      {expense.total_participants > 1 && (
+                        <div className="flex items-center gap-1">
+                          <FiUsers className="w-3 h-3 opacity-70" />
+                          <span>{expense.total_participants}</span>
+                        </div>
+                      )}
+
+                      {/* Subtle settlement status text */}
+                      {!settlement.isFullySettled && (
+                        <div
+                          className={`text-xs ${
+                            isUserBuyer ? "text-blue-600" : "text-amber-600"
+                          }`}
+                        >
+                          {isUserBuyer
+                            ? `${settlement.settledCount}/${settlement.totalCount} settled`
+                            : "Pending"}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Right section with amount */}
-                <div className="flex-shrink-0 ml-6">
-                  <div className="text-right">
-                    <div className="text-xl font-bold text-gray-900 tracking-tight">
-                      ₹
-                      <span>
-                        {isUserBuyer
-                          ? Number.isInteger(expense.amount)
-                            ? expense.amount.toLocaleString()
-                            : expense.amount.toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })
-                          : expense.total_participants
-                          ? Number.isInteger(
-                              calculateSplitAmount(
-                                expense.amount,
-                                expense.total_participants
-                              )
-                            )
-                            ? Math.floor(
-                                calculateSplitAmount(
-                                  expense.amount,
-                                  expense.total_participants
-                                )
-                              ).toLocaleString()
-                            : calculateSplitAmount(
-                                expense.amount,
-                                expense.total_participants
-                              ).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })
-                          : "N/A"}
-                      </span>
-                    </div>
-                    {!isUserBuyer && expense.total_participants && (
-                      <div className="text-xs text-gray-500 mt-1">
-                        of ₹{expense.amount.toLocaleString()}
-                      </div>
-                    )}
+                {/* Right amount */}
+                <div className="text-right pl-2">
+                  <div
+                    className={`text-lg font-medium ${
+                      isUserBuyer ? "text-gray-900" : "text-gray-700"
+                    }`}
+                  >
+                    ₹
+                    {isUserBuyer
+                      ? expense.amount.toLocaleString()
+                      : splitAmount.toLocaleString()}
                   </div>
+
+                  {!isUserBuyer && expense.total_participants > 1 && (
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      of ₹{expense.amount.toLocaleString()}
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Fully settled indicator - very subtle */}
+
+              {/* <div
+                className={`absolute bottom-0 left-0 right-0 h-1 rounded-b-2xl transition-all duration-300 ${
+                  settlement.isFullySettled
+                    ? "bg-green-400/50"
+                    : "bg-gradient-to-r from-amber-400/30 to-amber-400/10"
+                }`}
+              /> */}
             </div>
           );
         })}
@@ -1029,6 +1107,7 @@ export default function Dashboard() {
 
                 <QuickStats expense={selectedExpenseDetails} />
 
+                {/* Keep existing SettlementSummary - shows full details */}
                 <SettlementSummary expense={selectedExpenseDetails} />
 
                 <PaymentInfo expense={selectedExpenseDetails} />
