@@ -14,17 +14,17 @@ import {
   //   LoadingState,
 } from "./ExpenseModalComponenets";
 
-interface Expense {
-  id: string;
-  title: string;
-  amount: number;
-  buyer_id: string;
-  created_at: string;
-  total_participants?: number;
-  buyer_name?: string;
-  participants?: Participant[];
-  [key: string]: any;
-}
+// interface Expense {
+//   id: string;
+//   title: string;
+//   amount: number;
+//   buyer_id: string;
+//   created_at: string;
+//   total_participants?: number;
+//   buyer_name?: string;
+//   participants?: Participant[];
+//   [key: string]: any;
+// }
 
 interface Settlement {
   id: string;
