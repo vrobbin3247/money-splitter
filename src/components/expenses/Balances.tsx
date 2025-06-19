@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
+import { FaRupeeSign } from "react-icons/fa";
 import {
   FiArrowRight,
   FiArrowLeft,
   FiX,
-  FiDollarSign,
   FiCalendar,
   FiUsers,
   FiUser,
@@ -256,10 +256,9 @@ const Balances = ({ user }: BalancesProps) => {
         `Settlement for ${balance.breakdown.length} expenses`
       )}`;
 
-      // Open UPI app
       window.open(upiLink, "_blank");
 
-      // 3. Wait for user confirmation with better UX
+      // 3. Wait for user confirmation
       const paymentConfirmed = await new Promise<boolean>((resolve) => {
         const confirmDialog = confirm(
           `Did you complete the UPI payment of ₹${Math.abs(
@@ -277,35 +276,40 @@ const Balances = ({ user }: BalancesProps) => {
       }
 
       // 4. Create settlement record
-      const { error: settlementError } = await supabase
+      const { data: settlement, error: settlementError } = await supabase
         .from("settlements")
         .insert({
+          expense_id: null,
           payer_id: user.id,
           payee_id: balance.user.id,
           amount: Math.abs(balance.amount),
-          settlement_date: new Date().toISOString(),
+          settled_at: new Date().toISOString(),
           is_settled: true,
+          settlement_type: "complete",
           expense_details: balance.breakdown.map((b) => ({
             expense_id: b.expenseId,
             expense_title: b.expense,
             amount: b.yourShare,
           })),
-        });
+          notes: `Complete settlement for ${balance.breakdown.length} expenses`,
+        })
+        .select()
+        .single();
 
       if (settlementError) {
         console.error("Settlement record error:", settlementError);
         throw new Error("Failed to create settlement record");
       }
 
-      // 5. Mark all related expense participants as settled
+      // 5. FIXED: Mark ALL participants as settled for ALL expenses
+      // This is the key fix - update settlement_status for BOTH users in each expense
       const { error: updateError } = await supabase
         .from("expense_participants")
         .update({
           settlement_status: true,
-          settled_at: new Date().toISOString(),
         })
         .in("expense_id", expenseIds)
-        .eq("participant_id", user.id);
+        .in("participant_id", [user.id, balance.user.id]); // Update for BOTH users
 
       if (updateError) {
         console.error("Update participants error:", updateError);
@@ -316,7 +320,7 @@ const Balances = ({ user }: BalancesProps) => {
       setBalances((prev) => prev.filter((b) => b.id !== balance.id));
       setSelectedBalance(null);
 
-      // Show success feedback with better messaging
+      // Show success feedback
       const successMessage =
         `✅ Settlement Successful!\n\n` +
         `Amount: ₹${Math.abs(balance.amount).toFixed(2)}\n` +
@@ -464,7 +468,7 @@ const Balances = ({ user }: BalancesProps) => {
     <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200">
       <div className="flex items-center gap-2 mb-4">
         <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center">
-          <FiDollarSign className="w-4 h-4 text-green-600" />
+          <FaRupeeSign className="w-4 h-4 text-green-600" />
         </div>
         <h4 className="font-semibold text-gray-900">Expense Breakdown</h4>
       </div>
@@ -728,7 +732,7 @@ const Balances = ({ user }: BalancesProps) => {
           </div>
         ) : (
           <div className="text-center py-20">
-            <FiDollarSign className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <FaRupeeSign className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               All settled up!
             </h3>

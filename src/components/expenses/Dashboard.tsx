@@ -87,11 +87,9 @@ export default function Dashboard() {
     return Number(amount / totalParticipants);
   };
 
-  // Enhanced settlement function with better feedback
   const markAsSettled = async (participantId: string, expenseId: string) => {
     if (!user || !selectedExpenseDetails) return;
 
-    // Add participant to settling state
     setSettlingParticipants((prev) => new Set([...prev, participantId]));
 
     try {
@@ -120,7 +118,6 @@ export default function Dashboard() {
         throw new Error("You are not authorized to settle this expense");
       }
 
-      // User can only settle themselves unless they're the buyer
       if (!isBuyer && participantId !== user.id) {
         throw new Error("You can only settle your own share");
       }
@@ -134,7 +131,7 @@ export default function Dashboard() {
 
       if (updateError) throw updateError;
 
-      // Create settlement record (payer → payee)
+      // Create settlement record (MODIFIED: added settlement_type)
       const { data: settlement, error: settlementError } = await supabase
         .from("settlements")
         .insert([
@@ -147,13 +144,14 @@ export default function Dashboard() {
               selectedExpenseDetails.total_participants
             ),
             is_settled: true,
+            settlement_type: "individual", // NEW: specify type
           },
         ])
         .select();
 
       if (settlementError) throw settlementError;
 
-      // Update local state
+      // Update local state (rest remains the same)
       if (settlement) {
         setSettlements([...settlements, ...settlement]);
         setSelectedExpenseDetails({
@@ -165,7 +163,6 @@ export default function Dashboard() {
           ),
         });
 
-        // Show success feedback
         const participantName =
           selectedExpenseDetails.participants.find(
             (p) => p.participant_id === participantId
@@ -178,27 +175,21 @@ export default function Dashboard() {
           participantName,
         });
 
-        // Auto-hide feedback after 3 seconds
         setTimeout(() => {
           setSettlementFeedback((prev) => ({ ...prev, show: false }));
         }, 3000);
       }
     } catch (error: any) {
       console.error("Settlement error:", error);
-
-      // Show error feedback
       setSettlementFeedback({
         show: true,
         type: "error",
         message: error.message || "Failed to settle payment. Please try again.",
       });
-
-      // Auto-hide feedback after 4 seconds
       setTimeout(() => {
         setSettlementFeedback((prev) => ({ ...prev, show: false }));
       }, 4000);
     } finally {
-      // Remove participant from settling state
       setSettlingParticipants((prev) => {
         const newSet = new Set(prev);
         newSet.delete(participantId);
@@ -802,8 +793,8 @@ export default function Dashboard() {
     const settledCount = expense.participants.filter(
       (p) => p.settlement_status
     ).length;
-    const settlementProgress = (settledCount / (totalParticipants - 1)) * 100;
-    const isFullySettled = settledCount === totalParticipants - 1;
+    const settlementProgress = (settledCount / totalParticipants) * 100;
+    const isFullySettled = settledCount === totalParticipants;
 
     return (
       <div
@@ -839,7 +830,7 @@ export default function Dashboard() {
               isFullySettled ? "text-green-700" : "text-gray-600"
             }`}
           >
-            {settledCount}/{totalParticipants - 1} settled
+            {settledCount}/{totalParticipants} settled
           </span>
         </div>
 
@@ -932,7 +923,7 @@ export default function Dashboard() {
     }
 
     const isUserBuyer = expense.buyer_id === userId;
-    const totalCount = expense.total_participants - 1; // Exclude buyer
+    const totalCount = expense.total_participants; // Exclude buyer
     const settledCount = expense.participants
       ? expense.participants.filter((p: Participant) => p.settlement_status)
           .length

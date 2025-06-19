@@ -181,10 +181,11 @@ export default function ExpenseForm({
 
       if (expenseError) throw expenseError;
 
-      // Add participants
+      // Add participants with settlement_status based on whether they're the buyer
       const participantsData = formData.participants.map((id) => ({
         expense_id: expense.id,
         participant_id: id,
+        settlement_status: id === user?.id, // true for buyer, false for others
       }));
 
       const { error: participantsError } = await supabase
@@ -288,7 +289,7 @@ export default function ExpenseForm({
               name="amount"
               type="number"
               min="10"
-              step="10"
+              step="1"
               value={formData.amount || ""}
               onChange={handleInputChange}
               required

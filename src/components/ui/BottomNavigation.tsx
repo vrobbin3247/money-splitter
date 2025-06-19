@@ -1,5 +1,5 @@
-import { FiList, FiDollarSign, FiBarChart, FiPlus } from "react-icons/fi";
-
+import { FiList, FiBarChart, FiPlus } from "react-icons/fi";
+import { FaRupeeSign } from "react-icons/fa";
 interface BottomNavigationProps {
   activeTab: string;
   onTabChange: (tabId: string) => void;
@@ -20,7 +20,7 @@ export default function BottomNavigation({
     {
       id: "balances",
       label: "Balances",
-      icon: FiDollarSign,
+      icon: FaRupeeSign,
     },
     {
       id: "insights",
