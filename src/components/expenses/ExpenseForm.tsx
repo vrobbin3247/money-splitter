@@ -201,7 +201,8 @@ export default function ExpenseForm({
           user.id,
           formData.participants,
           formData.title,
-          formData.amount
+          formData.amount,
+          user.name
         );
       }
 

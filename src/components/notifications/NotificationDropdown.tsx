@@ -4,6 +4,7 @@ import { FaBell, FaTimes } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import useNotifications from "./useNotifications";
 import NotificationItem from "./NotificationItem";
+import type { NotificationWithRelations } from "./types";
 
 interface NotificationDropdownProps {
   userId: string;
@@ -89,7 +90,9 @@ const NotificationDropdown = ({
   }, [markAllAsRead]);
 
   const handleRetry = useCallback(() => {
-    refetch?.();
+    if (typeof refetch === "function") {
+      refetch();
+    }
   }, [refetch]);
 
   // Memoized notification count display
@@ -203,14 +206,12 @@ const NotificationDropdown = ({
                   <div className="text-red-500 mb-2">
                     Failed to load notifications
                   </div>
-                  {refetch && (
-                    <button
-                      onClick={handleRetry}
-                      className="text-sm text-blue-600 hover:text-blue-800 underline"
-                    >
-                      Try again
-                    </button>
-                  )}
+                  <button
+                    onClick={handleRetry}
+                    className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  >
+                    Try again
+                  </button>
                 </div>
               ) : notifications.length === 0 ? (
                 <div className="p-8 text-center">
@@ -222,13 +223,15 @@ const NotificationDropdown = ({
                 </div>
               ) : (
                 <div role="list" aria-label="Notification list">
-                  {notifications.map((notification) => (
-                    <NotificationItem
-                      key={notification.id}
-                      notification={notification}
-                      onMarkAsRead={markAsRead}
-                    />
-                  ))}
+                  {notifications.map(
+                    (notification: NotificationWithRelations) => (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onMarkAsRead={markAsRead}
+                      />
+                    )
+                  )}
                 </div>
               )}
             </div>

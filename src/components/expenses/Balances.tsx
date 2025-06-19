@@ -276,7 +276,7 @@ const Balances = ({ user }: BalancesProps) => {
       }
 
       // 4. Create settlement record
-      const { data: settlement, error: settlementError } = await supabase
+      const { error: settlementError } = await supabase
         .from("settlements")
         .insert({
           expense_id: null,

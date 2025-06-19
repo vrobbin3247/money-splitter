@@ -51,7 +51,7 @@ export const sendNotification = async (
 };
 
 // Additional notification service functions
-export const markAsRead = async (notificationId: string) => {
+export const markAsRead = async (_notificationId: string) => {
   /* ... */
 };
 
