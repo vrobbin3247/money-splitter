@@ -10,6 +10,7 @@ import { FaChevronDown } from "react-icons/fa";
 import Modal from "./components/ui/Modal";
 import Balances from "./components/expenses/Balances";
 import Analysis from "./components/expenses/Analysis";
+import History from "./components/expenses/History";
 import NotificationDropdown from "./components/notifications/NotificationDropdown";
 
 export default function Home() {
@@ -49,6 +50,8 @@ export default function Home() {
         return <Dashboard />;
       case "balances":
         return <Balances user={user} />;
+      case "history":
+        return <History user={user} />;
       case "insights":
         return <Analysis user={user} />;
       default:

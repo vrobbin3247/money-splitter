@@ -1,0 +1,114 @@
+create table public.expense_participants (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  expense_id uuid not null,
+  participant_id uuid not null,
+  created_at timestamp with time zone null default now(),
+  settlement_status boolean null default false,
+  constraint expense_participants_pkey primary key (id),
+  constraint expense_participants_expense_id_participant_id_key unique (expense_id, participant_id),
+  constraint expense_participants_expense_id_fkey foreign KEY (expense_id) references expenses (id) on delete CASCADE,
+  constraint expense_participants_participant_id_fkey foreign KEY (participant_id) references profiles (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+data : INSERT INTO "public"."expense_participants" ("id", "expense_id", "participant_id", "created_at", "settlement_status") VALUES ('927cf95e-74c1-49bc-a72e-bb0f91c8018d', '204ecb18-a6fa-4718-b4c6-e76c2f334b69', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 09:52:20.159042+00', 'true'), ('85ea37c4-d5c4-4b93-a4f9-58493f6d2b31', '204ecb18-a6fa-4718-b4c6-e76c2f334b69', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 09:52:20.159042+00', 'true'), ('dd4fc685-2cbd-4a62-8947-bd6d62cde83d', '382329af-3953-4795-b5b9-119b22d321d6', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 10:47:42.155941+00', 'true'), ('9aa05b16-d2d2-427a-a263-3c6b9ff849d1', '382329af-3953-4795-b5b9-119b22d321d6', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 10:47:42.155941+00', 'true'), ('544005ec-ef14-48bd-9dd5-1a9467056d2e', '4c2878df-610a-49ed-a53e-2d4e0b8b541e', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 10:48:41.109004+00', 'true'), ('3691d847-5b06-4e4f-9b2c-570fef86e69f', '4c2878df-610a-49ed-a53e-2d4e0b8b541e', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 10:48:41.109004+00', 'true'), ('68983a95-c791-4ac0-832e-12e1de3e3cff', '5a361315-d33d-47da-98c6-9db00f7209fa', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 10:45:37.297648+00', 'true'), ('99a1eab9-aa39-485a-bee5-74fda94183c1', '5a361315-d33d-47da-98c6-9db00f7209fa', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 10:45:37.297648+00', 'true'), ('4008bf50-e5d0-4035-a92e-6d954ab6d325', '7d74f2db-72a4-4e26-a513-c4327f52222d', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 09:51:43.598148+00', 'true'), ('ed6a2fdf-034d-48f6-8f98-3b9ac25cd13e', '7d74f2db-72a4-4e26-a513-c4327f52222d', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 09:51:43.598148+00', 'true'), ('ad68bb7f-bb8c-4f1a-a610-9e180869caff', '960fcdf3-6bb1-4388-b275-9c2f51ad4cd8', '0bdfe3a6-1201-46e8-8d8b-4e8a319bdea2', '2025-06-19 11:10:02.940954+00', 'false'), ('9e530912-54f6-4917-a11a-4f804fbb14b0', '960fcdf3-6bb1-4388-b275-9c2f51ad4cd8', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 11:10:02.940954+00', 'true'), ('6f2f25dd-cd31-47c7-9b7c-56d143d2cf02', 'aa9ea0d7-5699-4217-bad7-b83dcb5477f6', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 09:53:01.967084+00', 'true'), ('846628f3-302e-4c6c-8b7b-f2f45c1115ab', 'aa9ea0d7-5699-4217-bad7-b83dcb5477f6', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 09:53:01.967084+00', 'true'), ('03527391-aa78-4341-a161-13914816b05e', 'efcfdb96-965d-4f57-9858-055b6485a576', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 11:10:16.153235+00', 'true'), ('30d3f2c6-bc80-4d1b-b1c9-bc4bb47ac255', 'efcfdb96-965d-4f57-9858-055b6485a576', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 11:10:16.153235+00', 'true'), ('d81770e4-7170-44f3-ba2f-a5da72dbd430', 'f23874a5-e8cd-4b44-ae78-fa2c6a7ed634', '1daef074-6480-4da3-8dc9-eaecf33568f5', '2025-06-19 10:46:54.590059+00', 'true'), ('66fc1278-8282-473b-a698-1aef03163d2c', 'f23874a5-e8cd-4b44-ae78-fa2c6a7ed634', 'a9262053-6bf9-444e-839f-509727bd94c6', '2025-06-19 10:46:54.590059+00', 'true');
+
+create table public.expenses (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  buyer_id uuid not null,
+  title text not null,
+  amount numeric(10, 2) not null,
+  created_at timestamp with time zone null default now(),
+  category text null,
+  constraint expenses_pkey primary key (id),
+  constraint expenses_buyer_id_fkey foreign KEY (buyer_id) references profiles (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+data : INSERT INTO "public"."expenses" ("id", "buyer_id", "title", "amount", "created_at", "category") VALUES ('204ecb18-a6fa-4718-b4c6-e76c2f334b69', 'a9262053-6bf9-444e-839f-509727bd94c6', 'milk', '30.00', '2025-06-19 09:52:19.981607+00', 'food'), ('382329af-3953-4795-b5b9-119b22d321d6', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'bus fare', '50.00', '2025-06-19 10:47:42.033797+00', 'travel'), ('4c2878df-610a-49ed-a53e-2d4e0b8b541e', 'a9262053-6bf9-444e-839f-509727bd94c6', 'samosa', '44.00', '2025-06-19 10:48:40.978027+00', 'food'), ('5a361315-d33d-47da-98c6-9db00f7209fa', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'maggi', '24.00', '2025-06-19 10:45:37.091991+00', 'food'), ('7d74f2db-72a4-4e26-a513-c4327f52222d', 'a9262053-6bf9-444e-839f-509727bd94c6', 'tea', '40.00', '2025-06-19 09:51:43.223269+00', 'food'), ('960fcdf3-6bb1-4388-b275-9c2f51ad4cd8', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'notification test', '100.00', '2025-06-19 11:10:02.837357+00', 'misc'), ('aa9ea0d7-5699-4217-bad7-b83dcb5477f6', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'cab', '80.00', '2025-06-19 09:53:01.341385+00', 'travel'), ('efcfdb96-965d-4f57-9858-055b6485a576', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'test', '1000.00', '2025-06-19 11:10:16.058704+00', 'misc'), ('f23874a5-e8cd-4b44-ae78-fa2c6a7ed634', 'a9262053-6bf9-444e-839f-509727bd94c6', 'water jar', '60.00', '2025-06-19 10:46:54.410138+00', 'utilities');
+
+create trigger trigger_notify_expense_created
+after INSERT on expenses for EACH row
+execute FUNCTION notify_expense_created ();
+
+create table public.notifications (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  type text not null,
+  recipient_id uuid not null,
+  sender_id uuid not null,
+  expense_id uuid null,
+  settlement_id uuid null,
+  participant_id uuid null,
+  amount numeric(12, 2) null,
+  is_read boolean null default false,
+  created_at timestamp with time zone null default now(),
+  metadata jsonb null,
+  constraint notifications_pkey primary key (id),
+  constraint notifications_participant_id_fkey foreign KEY (participant_id) references profiles (id) on delete set null,
+  constraint notifications_expense_id_fkey foreign KEY (expense_id) references expenses (id) on delete set null,
+  constraint notifications_sender_id_fkey foreign KEY (sender_id) references profiles (id) on delete CASCADE,
+  constraint notifications_settlement_id_fkey foreign KEY (settlement_id) references settlements (id) on delete set null,
+  constraint notifications_recipient_id_fkey foreign KEY (recipient_id) references profiles (id) on delete CASCADE,
+  constraint notifications_type_check check (
+    (
+      type = any (
+        array[
+          'expense_created'::text,
+          'expense_updated'::text,
+          'individual_settlement'::text,
+          'balance_settlement'::text,
+          'payment_reminder'::text,
+          'new_roommate'::text,
+          'payment_received'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+create index IF not exists idx_notifications_recipient on public.notifications using btree (recipient_id) TABLESPACE pg_default;
+
+create index IF not exists idx_notifications_unread on public.notifications using btree (recipient_id, is_read) TABLESPACE pg_default
+where
+  (is_read = false);
+
+data : INSERT INTO "public"."notifications" ("id", "type", "recipient_id", "sender_id", "expense_id", "settlement_id", "participant_id", "amount", "is_read", "created_at", "metadata") VALUES ('32c442d0-517c-4076-b323-31e4f9818689', 'expense_created', 'a9262053-6bf9-444e-839f-509727bd94c6', '1daef074-6480-4da3-8dc9-eaecf33568f5', '382329af-3953-4795-b5b9-119b22d321d6', null, null, '25.00', 'true', '2025-06-19 10:47:42.26934+00', '{"expense_title": "bus fare", "participants_count": 2}'), ('47565a29-0511-461d-9afa-98d1070357c6', 'expense_created', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'a9262053-6bf9-444e-839f-509727bd94c6', '4c2878df-610a-49ed-a53e-2d4e0b8b541e', null, null, '22.00', 'true', '2025-06-19 10:48:41.207436+00', '{"expense_title": "samosa", "participants_count": 2}'), ('4f10d9eb-201b-4e64-b2ce-9dd152fd0d75', 'expense_created', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'a9262053-6bf9-444e-839f-509727bd94c6', '204ecb18-a6fa-4718-b4c6-e76c2f334b69', null, null, '15.00', 'true', '2025-06-19 09:52:20.345896+00', '{"expense_title": "milk", "participants_count": 2}'), ('5a8545d1-6dab-4a7f-95c9-9e207cbcccca', 'expense_created', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'a9262053-6bf9-444e-839f-509727bd94c6', 'f23874a5-e8cd-4b44-ae78-fa2c6a7ed634', null, null, '30.00', 'true', '2025-06-19 10:46:54.710908+00', '{"expense_title": "water jar", "participants_count": 2}'), ('5b198bcb-f345-4dfe-abff-e41959acf9c2', 'expense_created', 'a9262053-6bf9-444e-839f-509727bd94c6', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'efcfdb96-965d-4f57-9858-055b6485a576', null, null, '500.00', 'true', '2025-06-19 11:10:16.242973+00', '{"expense_title": "test", "participants_count": 2}'), ('829c4339-db2e-48ee-a43f-921704446853', 'expense_created', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'a9262053-6bf9-444e-839f-509727bd94c6', null, null, null, '12.00', 'true', '2025-06-19 10:32:41.469056+00', '{"expense_title": "maggi", "participants_count": 2}'), ('8da07df5-0b51-46f1-9965-5d5bf292468a', 'expense_created', 'a9262053-6bf9-444e-839f-509727bd94c6', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'aa9ea0d7-5699-4217-bad7-b83dcb5477f6', null, null, '40.00', 'true', '2025-06-19 09:53:02.628537+00', '{"expense_title": "cab", "participants_count": 2}'), ('aabf62a9-5175-4d4b-9c6a-14cb402b4a21', 'expense_created', '0bdfe3a6-1201-46e8-8d8b-4e8a319bdea2', '1daef074-6480-4da3-8dc9-eaecf33568f5', '960fcdf3-6bb1-4388-b275-9c2f51ad4cd8', null, null, '50.00', 'false', '2025-06-19 11:10:03.115107+00', '{"expense_title": "notification test", "participants_count": 2}'), ('aedf34ee-a91d-4244-9780-bcc483468faf', 'expense_created', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'a9262053-6bf9-444e-839f-509727bd94c6', '7d74f2db-72a4-4e26-a513-c4327f52222d', null, null, '20.00', 'true', '2025-06-19 09:51:44.014586+00', '{"expense_title": "tea", "participants_count": 2}'), ('dfc2ffc3-32ce-43e5-8bcd-051583acc26d', 'expense_created', 'a9262053-6bf9-444e-839f-509727bd94c6', '1daef074-6480-4da3-8dc9-eaecf33568f5', '5a361315-d33d-47da-98c6-9db00f7209fa', null, null, '12.00', 'true', '2025-06-19 10:45:37.412655+00', '{"expense_title": "maggi", "participants_count": 2}');
+
+create table public.profiles (
+  id uuid not null,
+  name text not null,
+  created_at timestamp with time zone null default now(),
+  upi_id character varying(50) null,
+  constraint profiles_pkey primary key (id),
+  constraint profiles_id_fkey foreign KEY (id) references auth.users (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+data : INSERT INTO "public"."profiles" ("id", "name", "created_at", "upi_id") VALUES ('0bdfe3a6-1201-46e8-8d8b-4e8a319bdea2', 'vaibhav 3', '2025-06-10 08:11:34.075359+00', 'vaibhavm3247@okicici'), ('1daef074-6480-4da3-8dc9-eaecf33568f5', 'main vaibhavm3247', '2025-06-09 09:28:02.198404+00', 'vaibhavm3247@okicici'), ('2871e9dc-3606-47ec-a273-4bf6a8d9c0e7', 'vaibhav temp', '2025-06-14 12:47:57.685665+00', null), ('71f6113c-55a3-409c-8e1b-732425aaaf21', 'Himanshu Tiwari ', '2025-06-14 12:49:39.334224+00', 'Fuugg@upi'), ('a9262053-6bf9-444e-839f-509727bd94c6', 'vaibhav2', '2025-06-09 09:28:39.771927+00', 'vaibhavm3247@okicici');
+
+
+create table public.settlements (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  expense_id uuid null,
+  payer_id uuid null,
+  payee_id uuid null,
+  amount numeric(12, 2) not null,
+  settled_at timestamp with time zone null default now(),
+  is_settled boolean null default false,
+  settlement_type character varying(20) null default 'individual'::character varying,
+  expense_details jsonb null,
+  notes text null,
+  constraint settlements_pkey primary key (id),
+  constraint settlements_expense_id_fkey foreign KEY (expense_id) references expenses (id),
+  constraint settlements_payee_id_fkey foreign KEY (payee_id) references profiles (id),
+  constraint settlements_payer_id_fkey foreign KEY (payer_id) references profiles (id)
+) TABLESPACE pg_default;
+
+create trigger check_settlement_auth BEFORE INSERT
+or
+update on settlements for EACH row
+execute FUNCTION validate_settlement ();
+
+create trigger trigger_notify_settlement
+after
+update on settlements for EACH row
+execute FUNCTION notify_settlement ();
+
+data : INSERT INTO "public"."settlements" ("id", "expense_id", "payer_id", "payee_id", "amount", "settled_at", "is_settled", "settlement_type", "expense_details", "notes") VALUES ('16ae1361-b030-44b8-8c2f-6192efa406a1', null, 'a9262053-6bf9-444e-839f-509727bd94c6', '1daef074-6480-4da3-8dc9-eaecf33568f5', '5.00', '2025-06-19 10:22:41.882+00', 'true', 'complete', '[{"amount": 15, "expense_id": "204ecb18-a6fa-4718-b4c6-e76c2f334b69", "expense_title": "milk"}, {"amount": 20, "expense_id": "7d74f2db-72a4-4e26-a513-c4327f52222d", "expense_title": "tea"}, {"amount": 40, "expense_id": "aa9ea0d7-5699-4217-bad7-b83dcb5477f6", "expense_title": "cab"}]', 'Complete settlement for 3 expenses'), ('614f9202-a1ec-4aea-86b0-17c9deefc5c7', '4c2878df-610a-49ed-a53e-2d4e0b8b541e', '1daef074-6480-4da3-8dc9-eaecf33568f5', 'a9262053-6bf9-444e-839f-509727bd94c6', '22.00', '2025-06-19 10:49:16.37709+00', 'true', 'individual', null, null), ('a1563105-44d8-4e25-93b7-c5bbf2ec1af3', null, 'a9262053-6bf9-444e-839f-509727bd94c6', '1daef074-6480-4da3-8dc9-eaecf33568f5', '7.00', '2025-06-19 10:49:48.475+00', 'true', 'complete', '[{"amount": 30, "expense_id": "f23874a5-e8cd-4b44-ae78-fa2c6a7ed634", "expense_title": "water jar"}, {"amount": 25, "expense_id": "382329af-3953-4795-b5b9-119b22d321d6", "expense_title": "bus fare"}, {"amount": 12, "expense_id": "5a361315-d33d-47da-98c6-9db00f7209fa", "expense_title": "maggi"}]', 'Complete settlement for 3 expenses'), ('e02dc114-1644-44ff-a585-33daecdca72b', 'efcfdb96-965d-4f57-9858-055b6485a576', 'a9262053-6bf9-444e-839f-509727bd94c6', '1daef074-6480-4da3-8dc9-eaecf33568f5', '500.00', '2025-06-19 15:29:32.246541+00', 'true', 'individual', null, null);
