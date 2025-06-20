@@ -9,6 +9,8 @@ import {
   FiUser,
   FiCheck,
   FiAlertCircle,
+  FiCreditCard,
+  FiClock,
 } from "react-icons/fi";
 import { supabase } from "../../lib/supabase";
 import Modal from "../ui/Modal";
@@ -34,12 +36,66 @@ interface Balance {
   }[];
 }
 
+interface PendingSettlement {
+  balanceId: string;
+  balance: Balance;
+  timestamp: number;
+}
+
 const Balances = ({ user }: BalancesProps) => {
   const [selectedBalance, setSelectedBalance] = useState<Balance | null>(null);
   const [balances, setBalances] = useState<Balance[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [settling, setSettling] = useState(false);
+  const [showPaymentConfirm, setShowPaymentConfirm] = useState(false);
+  const [pendingSettlement, setPendingSettlement] =
+    useState<PendingSettlement | null>(null);
+
+  // Check for pending settlements on component mount and visibility change
+  useEffect(() => {
+    const checkPendingSettlements = () => {
+      const stored = localStorage.getItem("pendingSettlement");
+      if (stored) {
+        try {
+          const pending: PendingSettlement = JSON.parse(stored);
+          // Check if settlement is recent (within 10 minutes)
+          const now = Date.now();
+          const timeDiff = now - pending.timestamp;
+          if (timeDiff < 10 * 60 * 1000) {
+            setPendingSettlement(pending);
+            setShowPaymentConfirm(true);
+          } else {
+            // Clean up old pending settlement
+            localStorage.removeItem("pendingSettlement");
+          }
+        } catch (e) {
+          localStorage.removeItem("pendingSettlement");
+        }
+      }
+    };
+
+    checkPendingSettlements();
+
+    // Listen for when user returns to the app
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setTimeout(checkPendingSettlements, 500);
+      }
+    };
+
+    const handleFocus = () => {
+      setTimeout(checkPendingSettlements, 500);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, []);
 
   useEffect(() => {
     async function calculateBalances() {
@@ -244,10 +300,15 @@ const Balances = ({ user }: BalancesProps) => {
     try {
       setSettling(true);
 
-      // 1. Get all expense IDs involved in this balance
-      const expenseIds = balance.breakdown.map((item) => item.expenseId);
+      // Store pending settlement in localStorage before opening UPI app
+      const pendingData: PendingSettlement = {
+        balanceId: balance.id,
+        balance: balance,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem("pendingSettlement", JSON.stringify(pendingData));
 
-      // 2. Create UPI payment link
+      // Create UPI payment link
       const upiLink = `upi://pay?pa=${
         balance.user.upi_id
       }&pn=${encodeURIComponent(balance.user.name)}&am=${Math.abs(
@@ -256,26 +317,62 @@ const Balances = ({ user }: BalancesProps) => {
         `Settlement for ${balance.breakdown.length} expenses`
       )}`;
 
-      window.open(upiLink, "_blank");
-
-      // 3. Wait for user confirmation
-      const paymentConfirmed = await new Promise<boolean>((resolve) => {
-        const confirmDialog = confirm(
-          `Did you complete the UPI payment of ₹${Math.abs(
-            balance.amount
-          ).toFixed(2)} to ${
-            balance.user.name
-          }?\n\nClick OK if payment was successful, Cancel if not.`
+      const isMobile =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
         );
-        resolve(confirmDialog);
-      });
 
-      if (!paymentConfirmed) {
+      if (isMobile) {
+        // On mobile, we'll show confirmation dialog immediately after trying to open UPI
+        window.location.href = upiLink;
+
+        // Wait a bit for the UPI app to potentially open, then show confirmation
+        setTimeout(() => {
+          setPendingSettlement(pendingData);
+          setShowPaymentConfirm(true);
+          setSettling(false);
+        }, 2000);
+      } else {
+        // On desktop, use the old method
+        window.open(upiLink, "_blank");
+
+        // Wait for user confirmation
+        const paymentConfirmed = await new Promise<boolean>((resolve) => {
+          const confirmDialog = confirm(
+            `Did you complete the UPI payment of ₹${Math.abs(
+              balance.amount
+            ).toFixed(2)} to ${
+              balance.user.name
+            }?\n\nClick OK if payment was successful, Cancel if not.`
+          );
+          resolve(confirmDialog);
+        });
+
+        if (paymentConfirmed) {
+          await completeSettlement(balance);
+        } else {
+          localStorage.removeItem("pendingSettlement");
+        }
         setSettling(false);
-        return;
       }
+    } catch (error) {
+      console.error("Settlement failed:", error);
+      localStorage.removeItem("pendingSettlement");
+      alert(
+        `❌ Settlement Failed\n\n${
+          error instanceof Error ? error.message : "Unknown error occurred"
+        }\n\nPlease try again or contact support if the issue persists.`
+      );
+      setSettling(false);
+    }
+  };
 
-      // 4. Create settlement record
+  const completeSettlement = async (balance: Balance) => {
+    try {
+      // Get all expense IDs involved in this balance
+      const expenseIds = balance.breakdown.map((item) => item.expenseId);
+
+      // Create settlement record
       const { data: settlement, error: settlementError } = await supabase
         .from("settlements")
         .insert({
@@ -300,44 +397,69 @@ const Balances = ({ user }: BalancesProps) => {
         console.error("Settlement record error:", settlementError);
         throw new Error("Failed to create settlement record");
       }
-      console.log("Created settlement:", settlement);
-      // 5. FIXED: Mark ALL participants as settled for ALL expenses
-      // This is the key fix - update settlement_status for BOTH users in each expense
+      console.log(settlement);
+
+      // Mark ALL participants as settled for ALL expenses
       const { error: updateError } = await supabase
         .from("expense_participants")
         .update({
           settlement_status: true,
         })
         .in("expense_id", expenseIds)
-        .in("participant_id", [user.id, balance.user.id]); // Update for BOTH users
+        .in("participant_id", [user.id, balance.user.id]);
 
       if (updateError) {
         console.error("Update participants error:", updateError);
         throw new Error("Failed to update settlement status");
       }
 
-      // 6. Update UI state
+      // Update UI state
       setBalances((prev) => prev.filter((b) => b.id !== balance.id));
       setSelectedBalance(null);
 
-      // Show success feedback
-      const successMessage =
-        `✅ Settlement Successful!\n\n` +
-        `Amount: ₹${Math.abs(balance.amount).toFixed(2)}\n` +
-        `To: ${balance.user.name}\n` +
-        `Expenses settled: ${balance.breakdown.length}\n\n` +
-        `All related expenses have been marked as settled.`;
+      // Clean up pending settlement
+      localStorage.removeItem("pendingSettlement");
 
-      alert(successMessage);
+      return true;
     } catch (error) {
-      console.error("Settlement failed:", error);
+      console.error("Settlement completion failed:", error);
+      throw error;
+    }
+  };
+
+  const handlePaymentConfirmation = async (confirmed: boolean) => {
+    if (!pendingSettlement) return;
+
+    try {
+      if (confirmed) {
+        await completeSettlement(pendingSettlement.balance);
+        // Show success message
+        setShowPaymentConfirm(false);
+        setPendingSettlement(null);
+
+        // You can add a success toast here instead of alert
+        setTimeout(() => {
+          alert(
+            `✅ Settlement completed successfully! ₹${Math.abs(
+              pendingSettlement.balance.amount
+            ).toFixed(2)} settled with ${pendingSettlement.balance.user.name}`
+          );
+        }, 500);
+      } else {
+        // User didn't complete payment
+        localStorage.removeItem("pendingSettlement");
+        setShowPaymentConfirm(false);
+        setPendingSettlement(null);
+      }
+    } catch (error) {
+      console.error("Payment confirmation failed:", error);
       alert(
         `❌ Settlement Failed\n\n${
           error instanceof Error ? error.message : "Unknown error occurred"
         }\n\nPlease try again or contact support if the issue persists.`
       );
-    } finally {
-      setSettling(false);
+      setShowPaymentConfirm(false);
+      setPendingSettlement(null);
     }
   };
 
@@ -376,6 +498,85 @@ const Balances = ({ user }: BalancesProps) => {
       console.error("Failed to copy reminder:", error);
       alert("Failed to create reminder. Please try again.");
     }
+  };
+
+  // Enhanced Payment Confirmation Modal
+  const PaymentConfirmationModal = () => {
+    if (!pendingSettlement) return null;
+
+    return (
+      <Modal isOpen={showPaymentConfirm} onClose={() => {}}>
+        <div className="max-w-md mx-auto">
+          <div className="text-center p-6">
+            {/* Icon */}
+            <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+              <FiCreditCard className="w-8 h-8 text-blue-600" />
+            </div>
+
+            {/* Title */}
+            <h3 className="text-xl font-bold text-gray-900 mb-2">
+              Payment Confirmation
+            </h3>
+
+            {/* Amount */}
+            <div className="text-3xl font-bold text-blue-600 mb-4">
+              ₹{Math.abs(pendingSettlement.balance.amount).toFixed(2)}
+            </div>
+
+            {/* Details */}
+            <div className="bg-gray-50 rounded-2xl p-4 mb-6">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">To:</span>
+                <span className="font-semibold text-gray-900">
+                  {pendingSettlement.balance.user.name}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-2">
+                <span className="text-gray-600">UPI ID:</span>
+                <span className="font-mono text-xs text-gray-700">
+                  {pendingSettlement.balance.user.upi_id}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-sm mt-2">
+                <span className="text-gray-600">Expenses:</span>
+                <span className="text-gray-700">
+                  {pendingSettlement.balance.breakdown.length} items
+                </span>
+              </div>
+            </div>
+
+            {/* Question */}
+            <p className="text-gray-600 mb-6">
+              Did you complete the UPI payment successfully?
+            </p>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => handlePaymentConfirmation(false)}
+                className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-2xl font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+              >
+                <FiX className="w-4 h-4" />
+                Not Yet
+              </button>
+              <button
+                onClick={() => handlePaymentConfirmation(true)}
+                className="flex-1 bg-green-600 text-white py-3 px-4 rounded-2xl font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-green-600/25"
+              >
+                <FiCheck className="w-4 h-4" />
+                Yes, Paid
+              </button>
+            </div>
+
+            {/* Timer indicator */}
+            <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-500">
+              <FiClock className="w-3 h-3" />
+              <span>This will expire in 10 minutes</span>
+            </div>
+          </div>
+        </div>
+      </Modal>
+    );
   };
 
   // Modal Components matching Dashboard style
@@ -629,6 +830,8 @@ const Balances = ({ user }: BalancesProps) => {
 
   return (
     <div className="pb-6">
+      <PaymentConfirmationModal />
+
       <div className="space-y-6">
         {/* Net Balance Card */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -743,7 +946,7 @@ const Balances = ({ user }: BalancesProps) => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Balance Detail Modal */}
       <Modal
         isOpen={!!selectedBalance}
         onClose={() => setSelectedBalance(null)}
