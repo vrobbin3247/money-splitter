@@ -3,15 +3,12 @@ import {
   FiCheck,
   FiArrowRight,
   FiCalendar,
-  FiUser,
   FiChevronDown,
   FiChevronUp,
   FiFilter,
   FiSearch,
   FiCreditCard,
-  FiDollarSign,
 } from "react-icons/fi";
-import { FaRupeeSign } from "react-icons/fa";
 import { supabase } from "../../lib/supabase";
 import Modal from "../ui/Modal";
 
