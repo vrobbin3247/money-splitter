@@ -276,7 +276,7 @@ const Balances = ({ user }: BalancesProps) => {
       }
 
       // 4. Create settlement record
-      const { error: settlementError } = await supabase
+      const { data: settlement, error: settlementError } = await supabase
         .from("settlements")
         .insert({
           expense_id: null,
@@ -300,7 +300,7 @@ const Balances = ({ user }: BalancesProps) => {
         console.error("Settlement record error:", settlementError);
         throw new Error("Failed to create settlement record");
       }
-
+      console.log("Created settlement:", settlement);
       // 5. FIXED: Mark ALL participants as settled for ALL expenses
       // This is the key fix - update settlement_status for BOTH users in each expense
       const { error: updateError } = await supabase
