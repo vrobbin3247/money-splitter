@@ -1,5 +1,7 @@
 # React + TypeScript + Vite
 
+![Badge](https://hitscounter.dev/api/hit?url=https%3A%2F%2Fgithub.com%2Fvrobbin3247%2Fmoney-splitter&label=views&icon=github&color=%23198754&message=&style=flat-square&tz=UTC)
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
